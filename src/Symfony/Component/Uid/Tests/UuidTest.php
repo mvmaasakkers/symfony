@@ -44,6 +44,32 @@ class UuidTest extends TestCase
         yield ['these are just thirty-six characters'];
     }
 
+    /**
+     * @dataProvider provideInvalidVariant
+     */
+    public function testInvalidVariant(string $uuid)
+    {
+        $uuid = new Uuid($uuid);
+        $this->assertFalse(Uuid::isValid($uuid));
+
+        $uuid = (string) $uuid;
+        $class = Uuid::class.'V'.$uuid[14];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid UUIDv'.$uuid[14].': "'.$uuid.'".');
+
+        new $class($uuid);
+    }
+
+    public function provideInvalidVariant(): iterable
+    {
+        yield ['8dac64d3-937a-1e7c-fa1d-d5d6c06a61f5'];
+        yield ['8dac64d3-937a-3e7c-fa1d-d5d6c06a61f5'];
+        yield ['8dac64d3-937a-4e7c-fa1d-d5d6c06a61f5'];
+        yield ['8dac64d3-937a-5e7c-fa1d-d5d6c06a61f5'];
+        yield ['8dac64d3-937a-6e7c-fa1d-d5d6c06a61f5'];
+    }
+
     public function testConstructorWithValidUuid()
     {
         $uuid = new UuidV4(self::A_UUID_V4);
@@ -142,6 +168,25 @@ class UuidTest extends TestCase
         $this->assertTrue(Uuid::isValid(self::A_UUID_V4));
         $this->assertFalse(UuidV4::isValid(self::A_UUID_V1));
         $this->assertTrue(UuidV4::isValid(self::A_UUID_V4));
+    }
+
+    public function testIsValidWithNilUuid()
+    {
+        $this->assertTrue(Uuid::isValid('00000000-0000-0000-0000-000000000000'));
+        $this->assertTrue(NilUuid::isValid('00000000-0000-0000-0000-000000000000'));
+
+        $this->assertFalse(UuidV1::isValid('00000000-0000-0000-0000-000000000000'));
+        $this->assertFalse(UuidV4::isValid('00000000-0000-0000-0000-000000000000'));
+    }
+
+    public function testIsValidWithMaxUuid()
+    {
+        $this->assertTrue(Uuid::isValid('ffffffff-ffff-ffff-ffff-ffffffffffff'));
+        $this->assertTrue(Uuid::isValid('FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF'));
+        $this->assertTrue(Uuid::isValid('fFFFFFFF-ffff-FFFF-FFFF-FFFFffFFFFFF'));
+
+        $this->assertFalse(UuidV5::isValid('ffffffff-ffff-ffff-ffff-ffffffffffff'));
+        $this->assertFalse(UuidV6::isValid('ffffffff-ffff-ffff-ffff-ffffffffffff'));
     }
 
     public function testEquals()
@@ -320,13 +365,13 @@ class UuidTest extends TestCase
 
     public function testGetDateTime()
     {
-        $this->assertEquals(\DateTimeImmutable::createFromFormat('U.u', '103072857660.684697'), ((new UuidV1('ffffffff-ffff-1fff-a456-426655440000'))->getDateTime()));
-        $this->assertEquals(\DateTimeImmutable::createFromFormat('U.u', '0.000001'), ((new UuidV1('1381400a-1dd2-11b2-a456-426655440000'))->getDateTime()));
+        $this->assertEquals(\DateTimeImmutable::createFromFormat('U.u', '103072857660.684697'), (new UuidV1('ffffffff-ffff-1fff-a456-426655440000'))->getDateTime());
+        $this->assertEquals(\DateTimeImmutable::createFromFormat('U.u', '0.000001'), (new UuidV1('1381400a-1dd2-11b2-a456-426655440000'))->getDateTime());
         $this->assertEquals(new \DateTimeImmutable('@0'), (new UuidV1('13814001-1dd2-11b2-a456-426655440000'))->getDateTime());
         $this->assertEquals(new \DateTimeImmutable('@0'), (new UuidV1('13814000-1dd2-11b2-a456-426655440000'))->getDateTime());
         $this->assertEquals(new \DateTimeImmutable('@0'), (new UuidV1('13813fff-1dd2-11b2-a456-426655440000'))->getDateTime());
-        $this->assertEquals(\DateTimeImmutable::createFromFormat('U.u', '-0.000001'), ((new UuidV1('13813ff6-1dd2-11b2-a456-426655440000'))->getDateTime()));
-        $this->assertEquals(new \DateTimeImmutable('@-12219292800'), ((new UuidV1('00000000-0000-1000-a456-426655440000'))->getDateTime()));
+        $this->assertEquals(\DateTimeImmutable::createFromFormat('U.u', '-0.000001'), (new UuidV1('13813ff6-1dd2-11b2-a456-426655440000'))->getDateTime());
+        $this->assertEquals(new \DateTimeImmutable('@-12219292800'), (new UuidV1('00000000-0000-1000-a456-426655440000'))->getDateTime());
     }
 
     public function testFromStringBase58Padding()

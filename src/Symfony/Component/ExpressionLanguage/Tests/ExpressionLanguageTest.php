@@ -121,8 +121,19 @@ class ExpressionLanguageTest extends TestCase
 
     public function shortCircuitProviderEvaluate()
     {
-        $object = $this->getMockBuilder(\stdClass::class)->setMethods(['foo'])->getMock();
-        $object->expects($this->never())->method('foo');
+        $object = new class(\Closure::fromCallable([static::class, 'fail'])) {
+            private $fail;
+
+            public function __construct(callable $fail)
+            {
+                $this->fail = $fail;
+            }
+
+            public function foo()
+            {
+                ($this->fail)();
+            }
+        };
 
         return [
             ['false and object.foo()', ['object' => $object], false],
@@ -237,12 +248,82 @@ class ExpressionLanguageTest extends TestCase
         $registerCallback($el);
     }
 
-    public function testCallBadCallable()
+    /**
+     * @dataProvider provideNullSafe
+     */
+    public function testNullSafeEvaluate($expression, $foo)
     {
+        $expressionLanguage = new ExpressionLanguage();
+        $this->assertNull($expressionLanguage->evaluate($expression, ['foo' => $foo]));
+    }
+
+    /**
+     * @dataProvider provideNullSafe
+     */
+    public function testNullSafeCompile($expression, $foo)
+    {
+        $expressionLanguage = new ExpressionLanguage();
+        $this->assertNull(eval(sprintf('return %s;', $expressionLanguage->compile($expression, ['foo' => 'foo']))));
+    }
+
+    public function provideNullSafe()
+    {
+        $foo = new class() extends \stdClass {
+            public function bar()
+            {
+                return null;
+            }
+        };
+
+        yield ['foo?.bar', null];
+        yield ['foo?.bar()', null];
+        yield ['foo.bar?.baz', (object) ['bar' => null]];
+        yield ['foo.bar?.baz()', (object) ['bar' => null]];
+        yield ['foo["bar"]?.baz', ['bar' => null]];
+        yield ['foo["bar"]?.baz()', ['bar' => null]];
+        yield ['foo.bar()?.baz', $foo];
+        yield ['foo.bar()?.baz()', $foo];
+
+        yield ['foo?.bar.baz', null];
+        yield ['foo?.bar["baz"]', null];
+        yield ['foo?.bar["baz"]["qux"]', null];
+        yield ['foo?.bar["baz"]["qux"].quux', null];
+        yield ['foo?.bar["baz"]["qux"].quux()', null];
+        yield ['foo?.bar().baz', null];
+        yield ['foo?.bar()["baz"]', null];
+        yield ['foo?.bar()["baz"]["qux"]', null];
+        yield ['foo?.bar()["baz"]["qux"].quux', null];
+        yield ['foo?.bar()["baz"]["qux"].quux()', null];
+    }
+
+    /**
+     * @dataProvider provideInvalidNullSafe
+     */
+    public function testNullSafeEvaluateFails($expression, $foo, $message)
+    {
+        $expressionLanguage = new ExpressionLanguage();
+
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/Unable to call method "\w+" of object "\w+"./');
-        $el = new ExpressionLanguage();
-        $el->evaluate('foo.myfunction()', ['foo' => new \stdClass()]);
+        $this->expectExceptionMessage($message);
+        $expressionLanguage->evaluate($expression, ['foo' => $foo]);
+    }
+
+    /**
+     * @dataProvider provideInvalidNullSafe
+     */
+    public function testNullSafeCompileFails($expression, $foo)
+    {
+        $expressionLanguage = new ExpressionLanguage();
+
+        $this->expectWarning();
+        eval(sprintf('return %s;', $expressionLanguage->compile($expression, ['foo' => 'foo'])));
+    }
+
+    public function provideInvalidNullSafe()
+    {
+        yield ['foo?.bar.baz', (object) ['bar' => null], 'Unable to get property "baz" of non-object "foo.bar".'];
+        yield ['foo?.bar["baz"]', (object) ['bar' => null], 'Unable to get an item of non-array "foo.bar".'];
+        yield ['foo?.bar["baz"].qux.quux', (object) ['bar' => ['baz' => null]], 'Unable to get property "qux" of non-object "foo.bar["baz"]".'];
     }
 
     /**

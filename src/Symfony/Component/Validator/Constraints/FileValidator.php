@@ -116,7 +116,7 @@ class FileValidator extends ConstraintValidator
             }
         }
 
-        if (!is_scalar($value) && !$value instanceof FileObject && !$value instanceof \Stringable) {
+        if (!\is_scalar($value) && !$value instanceof FileObject && !$value instanceof \Stringable) {
             throw new UnexpectedValueException($value, 'string');
         }
 
@@ -223,6 +223,13 @@ class FileValidator extends ConstraintValidator
         } else {
             $coef = self::MB_BYTES;
             $coefFactor = self::KB_BYTES;
+        }
+
+        // If $limit < $coef, $limitAsString could be < 1 with less than 3 decimals.
+        // In this case, we would end up displaying an allowed size < 1 (eg: 0.1 MB).
+        // It looks better to keep on factorizing (to display 100 kB for example).
+        while ($limit < $coef) {
+            $coef /= $coefFactor;
         }
 
         $limitAsString = (string) ($limit / $coef);

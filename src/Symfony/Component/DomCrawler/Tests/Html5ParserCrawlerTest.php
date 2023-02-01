@@ -13,7 +13,7 @@ namespace Symfony\Component\DomCrawler\Tests;
 
 class Html5ParserCrawlerTest extends AbstractCrawlerTest
 {
-    public function getDoctype(): string
+    public static function getDoctype(): string
     {
         return '<!DOCTYPE html>';
     }
@@ -29,8 +29,6 @@ class Html5ParserCrawlerTest extends AbstractCrawlerTest
     /** @dataProvider validHtml5Provider */
     public function testHtml5ParserParseContentStartingWithValidHeading(string $content)
     {
-        $this->skipTestIfHTML5LibraryNotAvailable();
-
         $crawler = $this->createCrawler();
         $crawler->addHtmlContent($content);
         self::assertEquals(
@@ -43,8 +41,6 @@ class Html5ParserCrawlerTest extends AbstractCrawlerTest
     /** @dataProvider invalidHtml5Provider */
     public function testHtml5ParserWithInvalidHeadedContent(string $content)
     {
-        $this->skipTestIfHTML5LibraryNotAvailable();
-
         $crawler = $this->createCrawler();
         $crawler->addHtmlContent($content);
         self::assertEmpty($crawler->filterXPath('//h1')->text(), '->addHtmlContent failed as expected');
@@ -52,7 +48,7 @@ class Html5ParserCrawlerTest extends AbstractCrawlerTest
 
     public function validHtml5Provider(): iterable
     {
-        $html = $this->getDoctype().'<html><body><h1><p>Foo</p></h1></body></html>';
+        $html = static::getDoctype().'<html><body><h1><p>Foo</p></h1></body></html>';
         $BOM = \chr(0xEF).\chr(0xBB).\chr(0xBF);
 
         yield 'BOM first' => [$BOM.$html];
@@ -60,21 +56,14 @@ class Html5ParserCrawlerTest extends AbstractCrawlerTest
         yield 'Multiline comment' => ["<!-- \n multiline comment \n -->".$html];
         yield 'Several comments' => ['<!--c--> <!--cc-->'.$html];
         yield 'Whitespaces' => ['    '.$html];
-        yield 'All together' => [$BOM.'  '.'<!--c-->'.$html];
+        yield 'All together' => [$BOM.'  <!--c-->'.$html];
     }
 
     public function invalidHtml5Provider(): iterable
     {
-        $html = $this->getDoctype().'<html><body><h1><p>Foo</p></h1></body></html>';
+        $html = static::getDoctype().'<html><body><h1><p>Foo</p></h1></body></html>';
 
         yield 'Text' => ['hello world'.$html];
         yield 'Text between comments' => ['<!--c--> test <!--cc-->'.$html];
-    }
-
-    private function skipTestIfHTML5LibraryNotAvailable(): void
-    {
-        if (!class_exists(\Masterminds\HTML5::class)) {
-            self::markTestSkipped('HTML5 library is not available');
-        }
     }
 }

@@ -32,6 +32,10 @@ class UnsupportedSchemeException extends LogicException
             'class' => Bridge\Discord\DiscordTransportFactory::class,
             'package' => 'symfony/discord-notifier',
         ],
+        'engagespot' => [
+            'class' => Bridge\Engagespot\EngagespotTransportFactory::class,
+            'package' => 'symfony/engagespot-notifier',
+        ],
         'esendex' => [
             'class' => Bridge\Esendex\EsendexTransportFactory::class,
             'package' => 'symfony/esendex-notifier',
@@ -135,6 +139,10 @@ class UnsupportedSchemeException extends LogicException
         'rocketchat' => [
             'class' => Bridge\RocketChat\RocketChatTransportFactory::class,
             'package' => 'symfony/rocket-chat-notifier',
+        ],
+        'sendberry' => [
+            'class' => Bridge\Sendberry\SendberryTransportFactory::class,
+            'package' => 'symfony/sendberry-notifier',
         ],
         'sendinblue' => [
             'class' => Bridge\Sendinblue\SendinblueTransportFactory::class,

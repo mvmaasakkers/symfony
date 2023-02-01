@@ -324,7 +324,7 @@ class XmlDescriptor extends Descriptor
                 if ($factory[0] instanceof Reference) {
                     $factoryXML->setAttribute('service', (string) $factory[0]);
                 } elseif ($factory[0] instanceof Definition) {
-                    throw new \InvalidArgumentException('Factory is not describable.');
+                    $factoryXML->setAttribute('service', sprintf('inline factory service (%s)', $factory[0]->getClass() ?? 'not configured'));
                 } else {
                     $factoryXML->setAttribute('class', $factory[0]);
                 }
@@ -421,7 +421,7 @@ class XmlDescriptor extends Descriptor
                 }
             } elseif ($argument instanceof \UnitEnum) {
                 $argumentXML->setAttribute('type', 'constant');
-                $argumentXML->appendChild(new \DOMText(var_export($argument, true)));
+                $argumentXML->appendChild(new \DOMText(ltrim(var_export($argument, true), '\\')));
             } else {
                 $argumentXML->appendChild(new \DOMText($argument));
             }
@@ -548,7 +548,7 @@ class XmlDescriptor extends Descriptor
             }
             $callableXML->setAttribute('name', $r->name);
 
-            if ($class = $r->getClosureScopeClass()) {
+            if ($class = \PHP_VERSION_ID >= 80111 ? $r->getClosureCalledClass() : $r->getClosureScopeClass()) {
                 $callableXML->setAttribute('class', $class->name);
                 if (!$r->getClosureThis()) {
                     $callableXML->setAttribute('static', 'true');

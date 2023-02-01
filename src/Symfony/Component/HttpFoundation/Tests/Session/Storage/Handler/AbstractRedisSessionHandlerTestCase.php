@@ -96,7 +96,7 @@ abstract class AbstractRedisSessionHandlerTestCase extends TestCase
         $this->storage->write('id', 'data');
         $ttl = $this->redisClient->ttl(self::PREFIX.'id');
 
-        $this->assertLessThanOrEqual(ini_get('session.gc_maxlifetime'), $ttl);
+        $this->assertLessThanOrEqual(\ini_get('session.gc_maxlifetime'), $ttl);
         $this->assertGreaterThanOrEqual(0, $ttl);
     }
 
@@ -156,6 +156,18 @@ abstract class AbstractRedisSessionHandlerTestCase extends TestCase
         $options = [
             'prefix' => self::PREFIX,
             'ttl' => $ttl,
+        ];
+
+        $handler = new RedisSessionHandler($this->redisClient, $options);
+        $handler->write('id', 'data');
+        $redisTtl = $this->redisClient->ttl(self::PREFIX.'id');
+
+        $this->assertLessThan($redisTtl, $ttl - 5);
+        $this->assertGreaterThan($redisTtl, $ttl + 5);
+
+        $options = [
+            'prefix' => self::PREFIX,
+            'ttl' => fn () => $ttl,
         ];
 
         $handler = new RedisSessionHandler($this->redisClient, $options);

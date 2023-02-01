@@ -11,7 +11,6 @@
 
 namespace Symfony\Component\Workflow\Dumper;
 
-use InvalidArgumentException;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Marking;
 use Symfony\Component\Workflow\Metadata\MetadataStoreInterface;
@@ -57,7 +56,7 @@ class PlantUmlDumper implements DumperInterface
     public function __construct(string $transitionType)
     {
         if (!\in_array($transitionType, self::TRANSITION_TYPES, true)) {
-            throw new InvalidArgumentException("Transition type '$transitionType' does not exist.");
+            throw new \InvalidArgumentException("Transition type '$transitionType' does not exist.");
         }
         $this->transitionType = $transitionType;
     }
@@ -103,8 +102,8 @@ class PlantUmlDumper implements DumperInterface
                         }
 
                         $lines = [
-                            "$fromEscaped -${transitionColor}-> ${transitionEscaped}${transitionLabel}",
-                            "$transitionEscaped -${transitionColor}-> ${toEscaped}${transitionLabel}",
+                            "{$fromEscaped} -{$transitionColor}-> {$transitionEscaped}{$transitionLabel}",
+                            "{$transitionEscaped} -{$transitionColor}-> {$toEscaped}{$transitionLabel}",
                         ];
                         foreach ($lines as $line) {
                             if (!\in_array($line, $code)) {
@@ -112,7 +111,7 @@ class PlantUmlDumper implements DumperInterface
                             }
                         }
                     } else {
-                        $code[] = "$fromEscaped -${transitionColor}-> $toEscaped: $transitionEscapedWithStyle";
+                        $code[] = "{$fromEscaped} -{$transitionColor}-> {$toEscaped}: {$transitionEscapedWithStyle}";
                     }
                 }
             }
@@ -209,9 +208,7 @@ class PlantUmlDumper implements DumperInterface
 
         $description = $workflowMetadata->getMetadata('description', $place);
         if (null !== $description) {
-            $output .= ' as '.$place.
-                \PHP_EOL.
-                $place.' : '.$description;
+            $output .= \PHP_EOL.$placeEscaped.' : '.$description;
         }
 
         return $output;

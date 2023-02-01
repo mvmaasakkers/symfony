@@ -89,6 +89,16 @@ class MicroKernelTraitTest extends TestCase
         $response = $kernel->handle($request);
 
         $this->assertEquals('Have a great day!', $response->getContent());
+
+        $request = Request::create('/h');
+        $response = $kernel->handle($request);
+
+        $this->assertEquals('Have a great day!', $response->getContent());
+
+        $request = Request::create('/easter');
+        $response = $kernel->handle($request);
+
+        $this->assertSame('easter', $response->getContent());
     }
 
     public function testSecretLoadedFromExtension()
@@ -101,7 +111,7 @@ class MicroKernelTraitTest extends TestCase
 
     public function testAnonymousMicroKernel()
     {
-        $kernel = new class('anonymous_kernel') extends MinimalKernel {
+        $kernel = $this->kernel = new class('anonymous_kernel') extends MinimalKernel {
             public function helloAction(): Response
             {
                 return new Response('Hello World!');
@@ -110,6 +120,7 @@ class MicroKernelTraitTest extends TestCase
             protected function configureContainer(ContainerConfigurator $c): void
             {
                 $c->extension('framework', [
+                    'http_method_override' => false,
                     'router' => ['utf8' => true],
                 ]);
                 $c->services()->set('logger', NullLogger::class);

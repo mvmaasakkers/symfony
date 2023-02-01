@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the Symfony package.
+ *
+ * (c) Fabien Potencier <fabien@symfony.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace Symfony\Component\Routing\Tests\Loader;
 
 use Doctrine\Common\Annotations\AnnotationReader;
@@ -17,7 +26,9 @@ class AnnotationClassLoaderWithAnnotationsTest extends AnnotationClassLoaderTest
             {
             }
         };
-        AnnotationRegistry::registerLoader('class_exists');
+        if (method_exists(AnnotationRegistry::class, 'registerLoader')) {
+            AnnotationRegistry::registerLoader('class_exists');
+        }
     }
 
     public function testDefaultRouteName()

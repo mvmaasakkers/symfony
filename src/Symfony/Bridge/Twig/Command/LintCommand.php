@@ -39,14 +39,13 @@ use Twig\Source;
 #[AsCommand(name: 'lint:twig', description: 'Lint a Twig template and outputs encountered errors')]
 class LintCommand extends Command
 {
-    private Environment $twig;
     private string $format;
 
-    public function __construct(Environment $twig)
-    {
+    public function __construct(
+        private Environment $twig,
+        private array $namePatterns = ['*.twig'],
+    ) {
         parent::__construct();
-
-        $this->twig = $twig;
     }
 
     protected function configure()
@@ -146,7 +145,7 @@ EOF
         if (is_file($filename)) {
             return [$filename];
         } elseif (is_dir($filename)) {
-            return Finder::create()->files()->in($filename)->name('*.twig');
+            return Finder::create()->files()->in($filename)->name($this->namePatterns);
         }
 
         throw new RuntimeException(sprintf('File or directory "%s" is not readable.', $filename));

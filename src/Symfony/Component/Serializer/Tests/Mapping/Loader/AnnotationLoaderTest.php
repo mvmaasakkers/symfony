@@ -134,6 +134,39 @@ abstract class AnnotationLoaderTest extends TestCase
         $loader->loadClassMetadata($classMetadata);
     }
 
+    public function testCanHandleUnrelatedIgnoredMethods()
+    {
+        $class = $this->getNamespace().'\Entity45016';
+
+        $this->expectException(MappingException::class);
+        $this->expectExceptionMessage(sprintf('Ignore on "%s::badIgnore()" cannot be added', $class));
+
+        $metadata = new ClassMetadata($class);
+        $loader = $this->getLoaderForContextMapping();
+
+        $loader->loadClassMetadata($metadata);
+    }
+
+    public function testIgnoreGetterWirhRequiredParameterIfIgnoreAnnotationIsUsed()
+    {
+        $classMetadata = new ClassMetadata($this->getNamespace().'\IgnoreDummyAdditionalGetter');
+        $this->getLoaderForContextMapping()->loadClassMetadata($classMetadata);
+
+        $attributes = $classMetadata->getAttributesMetadata();
+        self::assertArrayNotHasKey('extraValue', $attributes);
+        self::assertArrayHasKey('extraValue2', $attributes);
+    }
+
+    public function testIgnoreGetterWirhRequiredParameterIfIgnoreAnnotationIsNotUsed()
+    {
+        $classMetadata = new ClassMetadata($this->getNamespace().'\IgnoreDummyAdditionalGetterWithoutIgnoreAnnotations');
+        $this->getLoaderForContextMapping()->loadClassMetadata($classMetadata);
+
+        $attributes = $classMetadata->getAttributesMetadata();
+        self::assertArrayNotHasKey('extraValue', $attributes);
+        self::assertArrayHasKey('extraValue2', $attributes);
+    }
+
     abstract protected function createLoader(): AnnotationLoader;
 
     abstract protected function getNamespace(): string;

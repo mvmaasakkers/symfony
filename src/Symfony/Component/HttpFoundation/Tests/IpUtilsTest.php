@@ -74,6 +74,11 @@ class IpUtilsTest extends TestCase
             [false, '}__test|O:21:&quot;JDatabaseDriverMysqli&quot;:3:{s:2', '::1'],
             [false, '2a01:198:603:0:396e:4789:8e99:890f', 'unknown'],
             [false, '', '::1'],
+            [false, '127.0.0.1', '::1'],
+            [false, '0.0.0.0/8', '::1'],
+            [false,  '::1', '127.0.0.1'],
+            [false,  '::1', '0.0.0.0/8'],
+            [true, '::ffff:10.126.42.2', '::ffff:10.0.0.0/0'],
         ];
     }
 
@@ -130,6 +135,23 @@ class IpUtilsTest extends TestCase
             ['[2a01:198::3]', '[2a01:198::]'],
             ['::ffff:123.234.235.236', '::ffff:123.234.235.0'], // IPv4-mapped IPv6 addresses
             ['::123.234.235.236', '::123.234.235.0'], // deprecated IPv4-compatible IPv6 address
+        ];
+    }
+
+    /**
+     * @dataProvider getIp4SubnetMaskZeroData
+     */
+    public function testIp4SubnetMaskZero($matches, $remoteAddr, $cidr)
+    {
+        $this->assertSame($matches, IpUtils::checkIp4($remoteAddr, $cidr));
+    }
+
+    public function getIp4SubnetMaskZeroData()
+    {
+        return [
+            [true, '1.2.3.4', '0.0.0.0/0'],
+            [true, '1.2.3.4', '192.168.1.0/0'],
+            [false, '1.2.3.4', '256.256.256/0'], // invalid CIDR notation
         ];
     }
 }

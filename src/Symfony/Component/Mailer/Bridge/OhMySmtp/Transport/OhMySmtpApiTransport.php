@@ -60,14 +60,14 @@ final class OhMySmtpApiTransport extends AbstractApiTransport
         try {
             $statusCode = $response->getStatusCode();
             $result = $response->toArray(false);
-        } catch (DecodingExceptionInterface $e) {
+        } catch (DecodingExceptionInterface) {
             throw new HttpTransportException('Unable to send an email: '.$response->getContent(false).sprintf(' (code %d).', $statusCode), $response);
         } catch (TransportExceptionInterface $e) {
             throw new HttpTransportException('Could not reach the remote OhMySMTP endpoint.', $response, 0, $e);
         }
 
         if (200 !== $statusCode) {
-            throw new HttpTransportException('Unable to send an email: '.$result['Message'].sprintf(' (code %d).', $result['ErrorCode']), $response);
+            throw new HttpTransportException('Unable to send an email: '.$response->getContent(false), $response);
         }
 
         $sentMessage->setMessageId($result['id']);
@@ -103,7 +103,7 @@ final class OhMySmtpApiTransport extends AbstractApiTransport
             }
 
             $payload['Headers'][] = [
-                'Name' => $name,
+                'Name' => $header->getName(),
                 'Value' => $header->getBodyAsString(),
             ];
         }

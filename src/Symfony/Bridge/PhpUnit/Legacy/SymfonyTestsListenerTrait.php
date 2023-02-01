@@ -138,7 +138,7 @@ class SymfonyTestsListenerTrait
             if (!class_exists(AnnotationRegistry::class, false) && class_exists(AnnotationRegistry::class)) {
                 if (method_exists(AnnotationRegistry::class, 'registerUniqueLoader')) {
                     AnnotationRegistry::registerUniqueLoader('class_exists');
-                } else {
+                } elseif (method_exists(AnnotationRegistry::class, 'registerLoader')) {
                     AnnotationRegistry::registerLoader('class_exists');
                 }
             }
@@ -271,7 +271,7 @@ class SymfonyTestsListenerTrait
             $assertions = \count(self::$expectedDeprecations) + $test->getNumAssertions();
             if ($test->doesNotPerformAssertions() && $assertions > 0) {
                 $test->getTestResultObject()->addFailure($test, new RiskyTestError(sprintf('This test is annotated with "@doesNotPerformAssertions", but performed %s assertions', $assertions)), $time);
-            } elseif ($assertions === 0 && $test->getTestResultObject()->noneSkipped()) {
+            } elseif ($assertions === 0 && !$test->doesNotPerformAssertions() && $test->getTestResultObject()->noneSkipped()) {
                 $test->getTestResultObject()->addFailure($test, new RiskyTestError('This test did not perform any assertions'), $time);
             }
 

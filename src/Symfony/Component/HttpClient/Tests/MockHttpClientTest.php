@@ -217,12 +217,12 @@ class MockHttpClientTest extends HttpClientTestCase
         $this->assertSame(['Content-Length: 7'], $requestOptions['normalized_headers']['content-length']);
 
         $response = $client->request('POST', 'http://localhost:8057/post', [
-            'body' => 'abc=def',
+            'body' => "8\r\nSymfony \r\n5\r\nis aw\r\n6\r\nesome!\r\n0\r\n\r\n",
             'headers' => ['Transfer-Encoding: chunked'],
         ]);
 
         $requestOptions = $response->getRequestOptions();
-        $this->assertFalse(isset($requestOptions['normalized_headers']['content-length']));
+        $this->assertSame(['Content-Length: 19'], $requestOptions['normalized_headers']['content-length']);
 
         $response = $client->request('POST', 'http://localhost:8057/post', [
             'body' => '',
@@ -480,6 +480,7 @@ class MockHttpClientTest extends HttpClientTestCase
                 return $client;
 
             case 'testNonBlockingStream':
+            case 'testSeekAsyncStream':
                 $responses[] = new MockResponse((function () { yield '<1>'; yield ''; yield '<2>'; })(), ['response_headers' => $headers]);
                 break;
 

@@ -13,11 +13,15 @@ namespace Symfony\Component\Validator\Constraints;
 
 use Symfony\Component\Validator\Constraint;
 
+trigger_deprecation('symfony/validator', '6.1', 'The "%s" constraint is deprecated since symfony 6.1, use "ExpressionSyntax" instead.', ExpressionLanguageSyntax::class);
+
 /**
  * @Annotation
  * @Target({"PROPERTY", "METHOD", "ANNOTATION"})
  *
  * @author Andrey Sevastianov <mrpkmail@gmail.com>
+ *
+ * @deprecated since symfony 6.1, use ExpressionSyntax instead
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::TARGET_METHOD | \Attribute::IS_REPEATABLE)]
 class ExpressionLanguageSyntax extends Constraint

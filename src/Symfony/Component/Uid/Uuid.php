@@ -26,7 +26,7 @@ class Uuid extends AbstractUid
     protected const TYPE = 0;
     protected const NIL = '00000000-0000-0000-0000-000000000000';
 
-    public function __construct(string $uuid)
+    public function __construct(string $uuid, bool $checkVariant = false)
     {
         $type = preg_match('{^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$}Di', $uuid) ? (int) $uuid[14] : false;
 
@@ -35,6 +35,10 @@ class Uuid extends AbstractUid
         }
 
         $this->uid = strtolower($uuid);
+
+        if ($checkVariant && !\in_array($this->uid[19], ['8', '9', 'a', 'b'], true)) {
+            throw new \InvalidArgumentException(sprintf('Invalid UUID%s: "%s".', static::TYPE ? 'v'.static::TYPE : '', $uuid));
+        }
     }
 
     public static function fromString(string $uuid): static
@@ -51,7 +55,7 @@ class Uuid extends AbstractUid
             $uuid = substr_replace($uuid, '-', 18, 0);
             $uuid = substr_replace($uuid, '-', 23, 0);
         } elseif (26 === \strlen($uuid) && Ulid::isValid($uuid)) {
-            $ulid = new Ulid('00000000000000000000000000');
+            $ulid = new NilUlid();
             $ulid->uid = strtoupper($uuid);
             $uuid = $ulid->toRfc4122();
         }
@@ -64,6 +68,10 @@ class Uuid extends AbstractUid
             return new NilUuid();
         }
 
+        if (!\in_array($uuid[19], ['8', '9', 'a', 'b', 'A', 'B'], true)) {
+            return new self($uuid);
+        }
+
         return match ((int) $uuid[14]) {
             UuidV1::TYPE => new UuidV1($uuid),
             UuidV3::TYPE => new UuidV3($uuid),
@@ -72,7 +80,6 @@ class Uuid extends AbstractUid
             UuidV6::TYPE => new UuidV6($uuid),
             default => new self($uuid),
         };
-
     }
 
     final public static function v1(): UuidV1
@@ -108,7 +115,15 @@ class Uuid extends AbstractUid
 
     public static function isValid(string $uuid): bool
     {
-        if (!preg_match('{^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$}Di', $uuid)) {
+        if (self::NIL === $uuid && \in_array(static::class, [__CLASS__, NilUuid::class], true)) {
+            return true;
+        }
+
+        if (__CLASS__ === static::class && 'ffffffff-ffff-ffff-ffff-ffffffffffff' === strtr($uuid, 'F', 'f')) {
+            return true;
+        }
+
+        if (!preg_match('{^[0-9a-f]{8}(?:-[0-9a-f]{4}){2}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$}Di', $uuid)) {
             return false;
         }
 

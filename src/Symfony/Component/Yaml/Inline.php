@@ -50,7 +50,7 @@ class Inline
     /**
      * Converts a YAML string to a PHP value.
      *
-     * @param int   $flags      A bit field of PARSE_* constants to customize the YAML parser behavior
+     * @param int   $flags      A bit field of Yaml::PARSE_* constants to customize the YAML parser behavior
      * @param array $references Mapping of variable names to values
      *
      * @throws ParseException
@@ -77,7 +77,7 @@ class Inline
                 ++$i;
                 break;
             default:
-                $result = self::parseScalar($value, $flags, null, $i, null === $tag, $references);
+                $result = self::parseScalar($value, $flags, null, $i, true, $references);
         }
 
         // some comments are allowed at the end
@@ -370,7 +370,7 @@ class Inline
                         try {
                             $pos = 0;
                             $value = self::parseMapping('{'.$value.'}', $flags, $pos, $references);
-                        } catch (\InvalidArgumentException $e) {
+                        } catch (\InvalidArgumentException) {
                             // no, it's not
                         }
                     }
@@ -639,7 +639,6 @@ class Inline
                 }
 
                 return octdec($value);
-            // Optimize for returning strings.
             case \in_array($scalar[0], ['+', '-', '.'], true) || is_numeric($scalar[0]):
                 if (Parser::preg_match('{^[+-]?[0-9][0-9_]*$}', $scalar)) {
                     $scalar = str_replace('_', '', $scalar);
@@ -675,7 +674,7 @@ class Inline
                             if (false !== $scalar = $time->getTimestamp()) {
                                 return $scalar;
                             }
-                        } catch (\ValueError $e) {
+                        } catch (\ValueError) {
                             // no-op
                         }
 

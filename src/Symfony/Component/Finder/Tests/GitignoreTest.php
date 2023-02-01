@@ -1,4 +1,5 @@
 <?php
+
 /*
  * This file is part of the Symfony package.
  *
@@ -54,7 +55,7 @@ class GitignoreTest extends TestCase
         }
     }
 
-    public function provider(): array
+    public static function provider(): array
     {
         $cases = [
             [
@@ -348,7 +349,7 @@ class GitignoreTest extends TestCase
                     'logs/',
                     '!logs/important.log',
                 ],
-                ['logs/debug.log'/* must be pruned on traversal 'logs/important.log'*/],
+                ['logs/debug.log'/* must be pruned on traversal 'logs/important.log' */],
                 [],
             ],
             [
@@ -393,7 +394,7 @@ class GitignoreTest extends TestCase
 
     public function providerExtended(): array
     {
-        $basicCases = $this->provider();
+        $basicCases = self::provider();
 
         $cases = [];
         foreach ($basicCases as $case) {
@@ -822,7 +823,7 @@ class GitignoreTest extends TestCase
                 '!logs/important.log',
             ],
             [],
-            ['logs/debug.log'/* must be pruned on traversal 'logs/important.log'*/],
+            ['logs/debug.log'/* must be pruned on traversal 'logs/important.log' */],
         ];
 
         yield [

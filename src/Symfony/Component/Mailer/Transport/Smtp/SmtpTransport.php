@@ -138,7 +138,7 @@ class SmtpTransport extends AbstractTransport
             if ($this->started) {
                 try {
                     $this->executeCommand("RSET\r\n", [250]);
-                } catch (TransportExceptionInterface $_) {
+                } catch (TransportExceptionInterface) {
                     // ignore this exception as it probably means that the server error was final
                 }
             }
@@ -172,8 +172,6 @@ class SmtpTransport extends AbstractTransport
      * @param int[] $codes
      *
      * @throws TransportException when an invalid response if received
-     *
-     * @internal
      */
     public function executeCommand(string $command, array $codes): string
     {
@@ -225,6 +223,10 @@ class SmtpTransport extends AbstractTransport
         }
     }
 
+    /**
+     * @internal since version 6.1, to be made private in 7.0
+     * @final since version 6.1, to be made private in 7.0
+     */
     protected function doHeloCommand(): void
     {
         $this->executeCommand(sprintf("HELO %s\r\n", $this->domain), [250]);
@@ -274,7 +276,7 @@ class SmtpTransport extends AbstractTransport
 
         try {
             $this->executeCommand("QUIT\r\n", [221]);
-        } catch (TransportExceptionInterface $e) {
+        } catch (TransportExceptionInterface) {
         } finally {
             $this->stream->terminate();
             $this->started = false;
@@ -290,7 +292,7 @@ class SmtpTransport extends AbstractTransport
 
         try {
             $this->executeCommand("NOOP\r\n", [250]);
-        } catch (TransportExceptionInterface $e) {
+        } catch (TransportExceptionInterface) {
             $this->stop();
         }
     }
@@ -304,15 +306,14 @@ class SmtpTransport extends AbstractTransport
             throw new LogicException('You must set the expected response code.');
         }
 
-        if (!$response) {
-            throw new TransportException(sprintf('Expected response code "%s" but got an empty response.', implode('/', $codes)));
-        }
-
         [$code] = sscanf($response, '%3d');
         $valid = \in_array($code, $codes);
 
-        if (!$valid) {
-            throw new TransportException(sprintf('Expected response code "%s" but got code "%s", with message "%s".', implode('/', $codes), $code, trim($response)), $code);
+        if (!$valid || !$response) {
+            $codeStr = $code ? sprintf('code "%s"', $code) : 'empty code';
+            $responseStr = $response ? sprintf(', with message "%s"', trim($response)) : '';
+
+            throw new TransportException(sprintf('Expected response code "%s" but got ', implode('/', $codes)).$codeStr.$responseStr.'.', $code ?: 0);
         }
     }
 

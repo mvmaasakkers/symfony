@@ -123,8 +123,12 @@ final class LocoProvider implements ProviderInterface
                     $this->logger->info(sprintf('No modifications found for locale "%s" and domain "%s" in Loco.', $locale, $domain));
 
                     $catalogue = new MessageCatalogue($locale);
+                    $previousMessages = $previousCatalogue->all($domain);
 
-                    foreach ($previousCatalogue->all($domain) as $key => $message) {
+                    if (!str_ends_with($domain, $catalogue::INTL_DOMAIN_SUFFIX)) {
+                        $previousMessages = array_diff_key($previousMessages, $previousCatalogue->all($domain.$catalogue::INTL_DOMAIN_SUFFIX));
+                    }
+                    foreach ($previousMessages as $key => $message) {
                         $catalogue->set($this->retrieveKeyFromId($key, $domain), $message, $domain);
                     }
 
@@ -184,12 +188,16 @@ final class LocoProvider implements ProviderInterface
         }
 
         foreach ($responses as $key => $response) {
-            if (403 === $response->getStatusCode()) {
+            if (403 === $statusCode = $response->getStatusCode()) {
                 $this->logger->error('The API key used does not have sufficient permissions to delete assets.');
             }
 
-            if (200 !== $response->getStatusCode() && 404 !== $response->getStatusCode()) {
+            if (200 !== $statusCode && 404 !== $statusCode) {
                 $this->logger->error(sprintf('Unable to delete translation key "%s" to Loco: "%s".', $key, $response->getContent(false)));
+
+                if (500 <= $statusCode) {
+                    throw new ProviderException(sprintf('Unable to delete translation key "%s" to Loco.', $key), $response);
+                }
             }
         }
     }
@@ -201,8 +209,12 @@ final class LocoProvider implements ProviderInterface
     {
         $response = $this->client->request('GET', 'assets', ['query' => ['filter' => $domain]]);
 
-        if (200 !== $response->getStatusCode()) {
+        if (200 !== $statusCode = $response->getStatusCode()) {
             $this->logger->error(sprintf('Unable to get assets from Loco: "%s".', $response->getContent(false)));
+
+            if (500 <= $statusCode) {
+                throw new ProviderException('Unable to get assets from Loco.', $response);
+            }
         }
 
         return array_map(function ($asset) {
@@ -226,8 +238,12 @@ final class LocoProvider implements ProviderInterface
         }
 
         foreach ($responses as $key => $response) {
-            if (201 !== $response->getStatusCode()) {
-                $this->logger->error(sprintf('Unable to add new translation key "%s" to Loco: (status code: "%s") "%s".', $key, $response->getStatusCode(), $response->getContent(false)));
+            if (201 !== $statusCode = $response->getStatusCode()) {
+                $this->logger->error(sprintf('Unable to add new translation key "%s" to Loco: (status code: "%s") "%s".', $key, $statusCode, $response->getContent(false)));
+
+                if (500 <= $statusCode) {
+                    throw new ProviderException(sprintf('Unable to add new translation key "%s" to Loco: (status code: "%s").', $key, $statusCode), $response);
+                }
             } else {
                 $createdIds[] = $response->toArray(false)['id'];
             }
@@ -243,12 +259,17 @@ final class LocoProvider implements ProviderInterface
         foreach ($translations as $id => $message) {
             $responses[$id] = $this->client->request('POST', sprintf('translations/%s/%s', rawurlencode($id), rawurlencode($locale)), [
                 'body' => $message,
+                'headers' => ['Content-Type' => 'text/plain'],
             ]);
         }
 
         foreach ($responses as $id => $response) {
-            if (200 !== $response->getStatusCode()) {
+            if (200 !== $statusCode = $response->getStatusCode()) {
                 $this->logger->error(sprintf('Unable to add translation for key "%s" in locale "%s" to Loco: "%s".', $id, $locale, $response->getContent(false)));
+
+                if (500 <= $statusCode) {
+                    throw new ProviderException(sprintf('Unable to add translation for key "%s" in locale "%s" to Loco.', $id, $locale), $response);
+                }
             }
         }
     }
@@ -269,13 +290,19 @@ final class LocoProvider implements ProviderInterface
             }
         }
 
-        // Set tags for all ids without comma.
-        $response = $this->client->request('POST', sprintf('tags/%s.json', rawurlencode($tag)), [
-            'body' => implode(',', $idsWithoutComma),
-        ]);
+        if ([] !== $idsWithoutComma) {
+            // Set tags for all ids without comma.
+            $response = $this->client->request('POST', sprintf('tags/%s.json', rawurlencode($tag)), [
+                'body' => implode(',', $idsWithoutComma),
+            ]);
 
-        if (200 !== $response->getStatusCode()) {
-            $this->logger->error(sprintf('Unable to tag assets with "%s" on Loco: "%s".', $tag, $response->getContent(false)));
+            if (200 !== $statusCode = $response->getStatusCode()) {
+                $this->logger->error(sprintf('Unable to tag assets with "%s" on Loco: "%s".', $tag, $response->getContent(false)));
+
+                if (500 <= $statusCode) {
+                    throw new ProviderException(sprintf('Unable to tag assets with "%s" on Loco.', $tag), $response);
+                }
+            }
         }
 
         // Set tags for each id with comma one by one.
@@ -284,8 +311,12 @@ final class LocoProvider implements ProviderInterface
                 'body' => ['name' => $tag],
             ]);
 
-            if (200 !== $response->getStatusCode()) {
+            if (200 !== $statusCode = $response->getStatusCode()) {
                 $this->logger->error(sprintf('Unable to tag asset "%s" with "%s" on Loco: "%s".', $id, $tag, $response->getContent(false)));
+
+                if (500 <= $statusCode) {
+                    throw new ProviderException(sprintf('Unable to tag asset "%s" with "%s" on Loco.', $id, $tag), $response);
+                }
             }
         }
     }
@@ -298,8 +329,12 @@ final class LocoProvider implements ProviderInterface
             ],
         ]);
 
-        if (201 !== $response->getStatusCode()) {
+        if (201 !== $statusCode = $response->getStatusCode()) {
             $this->logger->error(sprintf('Unable to create tag "%s" on Loco: "%s".', $tag, $response->getContent(false)));
+
+            if (500 <= $statusCode) {
+                throw new ProviderException(sprintf('Unable to create tag "%s" on Loco.', $tag), $response);
+            }
         }
     }
 
@@ -323,8 +358,12 @@ final class LocoProvider implements ProviderInterface
             ],
         ]);
 
-        if (201 !== $response->getStatusCode()) {
+        if (201 !== $statusCode = $response->getStatusCode()) {
             $this->logger->error(sprintf('Unable to create locale "%s" on Loco: "%s".', $locale, $response->getContent(false)));
+
+            if (500 <= $statusCode) {
+                throw new ProviderException(sprintf('Unable to create locale "%s" on Loco.', $locale), $response);
+            }
         }
     }
 

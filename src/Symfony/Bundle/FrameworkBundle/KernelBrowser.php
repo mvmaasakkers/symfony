@@ -22,7 +22,6 @@ use Symfony\Component\HttpKernel\HttpKernelBrowser;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\HttpKernel\Profiler\Profile as HttpProfile;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Simulates a browser and makes requests to a Kernel object.
@@ -116,11 +115,11 @@ class KernelBrowser extends HttpKernelBrowser
         }
 
         if (!$user instanceof UserInterface) {
-            throw new \LogicException(sprintf('The first argument of "%s" must be instance of "%s", "%s" provided.', __METHOD__, UserInterface::class, \is_object($user) ? \get_class($user) : \gettype($user)));
+            throw new \LogicException(sprintf('The first argument of "%s" must be instance of "%s", "%s" provided.', __METHOD__, UserInterface::class, get_debug_type($user)));
         }
 
         $token = new TestBrowserToken($user->getRoles(), $user, $firewallContext);
-        // required for compatibilty with Symfony 5.4
+        // required for compatibility with Symfony 5.4
         if (method_exists($token, 'isAuthenticated')) {
             $token->setAuthenticated(true, false);
         }
@@ -157,12 +156,8 @@ class KernelBrowser extends HttpKernelBrowser
         // avoid shutting down the Kernel if no request has been performed yet
         // WebTestCase::createClient() boots the Kernel but do not handle a request
         if ($this->hasPerformedRequest && $this->reboot) {
-            $container = $this->kernel->getContainer();
+            $this->kernel->boot();
             $this->kernel->shutdown();
-
-            if ($container instanceof ResetInterface) {
-                $container->reset();
-            }
         } else {
             $this->hasPerformedRequest = true;
         }

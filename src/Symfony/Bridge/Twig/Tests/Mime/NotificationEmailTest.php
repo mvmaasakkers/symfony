@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the Symfony package.
+ *
+ * (c) Fabien Potencier <fabien@symfony.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace Symfony\Bridge\Twig\Tests\Mime;
 
 use PHPUnit\Framework\TestCase;
@@ -38,6 +47,7 @@ class NotificationEmailTest extends TestCase
             ->importance(NotificationEmail::IMPORTANCE_HIGH)
             ->action('Bar', 'http://example.com/')
             ->context(['a' => 'b'])
+            ->theme('example')
         ));
         $this->assertEquals([
             'importance' => NotificationEmail::IMPORTANCE_HIGH,
@@ -50,6 +60,8 @@ class NotificationEmailTest extends TestCase
             'a' => 'b',
             'footer_text' => 'Notification e-mail sent by Symfony',
         ], $email->getContext());
+
+        $this->assertSame('@email/example/notification/body.html.twig', $email->getHtmlTemplate());
     }
 
     public function testTheme()

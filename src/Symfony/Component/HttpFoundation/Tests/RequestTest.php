@@ -1607,6 +1607,20 @@ class RequestTest extends TestCase
         $this->assertEquals(['zh', 'cherokee'], $request->getLanguages());
     }
 
+    public function testGetAcceptHeadersReturnString()
+    {
+        $request = new Request();
+        $request->headers->set('Accept', '123');
+        $request->headers->set('Accept-Charset', '123');
+        $request->headers->set('Accept-Encoding', '123');
+        $request->headers->set('Accept-Language', '123');
+
+        $this->assertSame(['123'], $request->getAcceptableContentTypes());
+        $this->assertSame(['123'], $request->getCharsets());
+        $this->assertSame(['123'], $request->getEncodings());
+        $this->assertSame(['123'], $request->getLanguages());
+    }
+
     public function testGetRequestFormat()
     {
         $request = new Request();
@@ -1685,6 +1699,12 @@ class RequestTest extends TestCase
         $asString = (string) $request;
 
         $this->assertStringContainsString('Cookie: Foo=Bar; Another=Cookie', $asString);
+
+        $request->cookies->set('foo.bar', [1, 2]);
+
+        $asString = (string) $request;
+
+        $this->assertStringContainsString('foo.bar%5B0%5D=1; foo.bar%5B1%5D=2', $asString);
     }
 
     public function testIsMethod()
@@ -2355,7 +2375,7 @@ class RequestTest extends TestCase
     {
         Request::setTrustedProxies(['1.1.1.1'], Request::HEADER_X_FORWARDED_TRAEFIK);
 
-        //test with index deployed under root
+        // test with index deployed under root
         $request = Request::create('/method');
         $request->server->set('REMOTE_ADDR', '1.1.1.1');
         $request->headers->set('X-Forwarded-Prefix', '/myprefix');
@@ -2376,7 +2396,7 @@ class RequestTest extends TestCase
             'PHP_SELF' => '/public/index.php',
         ];
 
-        //test with index file deployed in subdir, i.e. local dev server (insecure!!)
+        // test with index file deployed in subdir, i.e. local dev server (insecure!!)
         $request = Request::create('/public/method', 'GET', [], [], [], $server);
         $request->server->set('REMOTE_ADDR', '1.1.1.1');
         $request->headers->set('X-Forwarded-Prefix', '/prefix');
@@ -2389,7 +2409,7 @@ class RequestTest extends TestCase
 
     public function testTrustedPrefixEmpty()
     {
-        //check that there is no error, if no prefix is provided
+        // check that there is no error, if no prefix is provided
         Request::setTrustedProxies(['1.1.1.1'], Request::HEADER_X_FORWARDED_TRAEFIK);
         $request = Request::create('/method');
         $request->server->set('REMOTE_ADDR', '1.1.1.1');

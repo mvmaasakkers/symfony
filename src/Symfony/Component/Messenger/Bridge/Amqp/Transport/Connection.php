@@ -32,6 +32,9 @@ class Connection
         'x-message-ttl',
     ];
 
+    /**
+     * @see https://github.com/php-amqp/php-amqp/blob/master/amqp_connection_resource.h
+     */
     private const AVAILABLE_OPTIONS = [
         'host',
         'port',
@@ -52,6 +55,7 @@ class Connection
         'write_timeout',
         'confirm_timeout',
         'connect_timeout',
+        'rpc_timeout',
         'cacert',
         'cert',
         'key',
@@ -90,6 +94,11 @@ class Connection
     private array $amqpQueues = [];
 
     private \AMQPExchange $amqpDelayExchange;
+
+    /**
+     * @var int
+     */
+    private $lastActivityTime = 0;
 
     public function __construct(array $connectionOptions, array $exchangeOptions, array $queuesOptions, AmqpFactory $amqpFactory = null)
     {
@@ -184,11 +193,11 @@ class Connection
         self::validateOptions($amqpOptions);
 
         if (isset($parsedUrl['user'])) {
-            $amqpOptions['login'] = $parsedUrl['user'];
+            $amqpOptions['login'] = urldecode($parsedUrl['user']);
         }
 
         if (isset($parsedUrl['pass'])) {
-            $amqpOptions['password'] = $parsedUrl['pass'];
+            $amqpOptions['password'] = urldecode($parsedUrl['pass']);
         }
 
         if (!isset($amqpOptions['queues'])) {
@@ -267,7 +276,7 @@ class Connection
 
     private static function hasCaCertConfigured(array $amqpOptions): bool
     {
-        return (isset($amqpOptions['cacert']) && '' !== $amqpOptions['cacert']) || '' !== ini_get('amqp.cacert');
+        return (isset($amqpOptions['cacert']) && '' !== $amqpOptions['cacert']) || '' !== \ini_get('amqp.cacert');
     }
 
     /**
@@ -331,6 +340,8 @@ class Connection
         $attributes['headers'] = array_merge($attributes['headers'] ?? [], $headers);
         $attributes['delivery_mode'] = $attributes['delivery_mode'] ?? 2;
         $attributes['timestamp'] = $attributes['timestamp'] ?? time();
+
+        $this->lastActivityTime = time();
 
         $exchange->publish(
             $body,
@@ -495,6 +506,11 @@ class Connection
                     }
                 );
             }
+
+            $this->lastActivityTime = time();
+        } elseif (0 < ($this->connectionOptions['heartbeat'] ?? 0) && time() > $this->lastActivityTime + 2 * $this->connectionOptions['heartbeat']) {
+            $disconnectMethod = 'true' === ($this->connectionOptions['persistent'] ?? 'false') ? 'pdisconnect' : 'disconnect';
+            $this->amqpChannel->getConnection()->{$disconnectMethod}();
         }
 
         return $this->amqpChannel;
@@ -559,8 +575,4 @@ class Connection
     {
         return $amqpStamp?->getRoutingKey() ?? $this->getDefaultPublishRoutingKey();
     }
-}
-
-if (!class_exists(\Symfony\Component\Messenger\Transport\AmqpExt\Connection::class, false)) {
-    class_alias(Connection::class, \Symfony\Component\Messenger\Transport\AmqpExt\Connection::class);
 }

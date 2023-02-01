@@ -66,7 +66,9 @@ final class NativeResponse implements ResponseInterface, StreamableInterface
         // Temporary resource to dechunk the response stream
         $this->buffer = fopen('php://temp', 'w+');
 
+        $info['original_url'] = implode('', $info['url']);
         $info['user_data'] = $options['user_data'];
+        $info['max_duration'] = $options['max_duration'];
         ++$multi->responseCount;
 
         $this->initializer = static function (self $response) {

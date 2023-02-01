@@ -4,7 +4,11 @@ CHANGELOG
 6.1
 ---
 
+ * Add the `fields` option to the `Unique` constraint, to define which collection keys should be checked for uniqueness
  * Deprecate `Constraint::$errorNames`, use `Constraint::ERROR_NAMES` instead
+ * Deprecate constraint `ExpressionLanguageSyntax`, use `ExpressionSyntax` instead
+ * Add method `__toString()` to `ConstraintViolationInterface` & `ConstraintViolationListInterface`
+ * Allow creating constraints with required arguments
 
 6.0
 ---
@@ -66,6 +70,7 @@ CHANGELOG
 5.1.0
 -----
 
+ * Add `AtLeastOneOf` constraint that is considered to be valid if at least one of the nested constraints is valid
  * added the `Hostname` constraint and validator
  * added the `alpha3` option to the `Country` and `Language` constraints
  * allow to define a reusable set of constraints by extending the `Compound` constraint

@@ -188,7 +188,7 @@ class JsonDescriptor extends Descriptor
         // before json_encode (which will not display anything for \UnitEnum otherwise)
         array_walk_recursive($data, static function (&$value) {
             if ($value instanceof \UnitEnum) {
-                $value = var_export($value, true);
+                $value = ltrim(var_export($value, true), '\\');
             }
         });
 
@@ -245,7 +245,7 @@ class JsonDescriptor extends Descriptor
                 if ($factory[0] instanceof Reference) {
                     $data['factory_service'] = (string) $factory[0];
                 } elseif ($factory[0] instanceof Definition) {
-                    throw new \InvalidArgumentException('Factory is not describable.');
+                    $data['factory_service'] = sprintf('inline factory service (%s)', $factory[0]->getClass() ?? 'class not configured');
                 } else {
                     $data['factory_class'] = $factory[0];
                 }
@@ -361,7 +361,7 @@ class JsonDescriptor extends Descriptor
             }
             $data['name'] = $r->name;
 
-            if ($class = $r->getClosureScopeClass()) {
+            if ($class = \PHP_VERSION_ID >= 80111 ? $r->getClosureCalledClass() : $r->getClosureScopeClass()) {
                 $data['class'] = $class->name;
                 if (!$r->getClosureThis()) {
                     $data['static'] = true;

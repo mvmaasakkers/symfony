@@ -103,7 +103,7 @@ class PhpArrayAdapter implements AdapterInterface, CacheInterface, PruneableInte
             if ($value instanceof \Closure) {
                 return $value();
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             unset($this->keys[$key]);
             goto get_from_pool;
         }
@@ -134,7 +134,7 @@ class PhpArrayAdapter implements AdapterInterface, CacheInterface, PruneableInte
         } elseif ($value instanceof \Closure) {
             try {
                 $value = $value();
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
                 $value = null;
                 $isHit = false;
             }
@@ -329,7 +329,7 @@ EOF;
                     $isStaticValue = false;
                 }
                 $value = var_export($value, true);
-            } elseif (!is_scalar($value)) {
+            } elseif (!\is_scalar($value)) {
                 throw new InvalidArgumentException(sprintf('Cache key "%s" has non-serializable "%s" value.', $key, get_debug_type($value)));
             } else {
                 $value = var_export($value, true);
@@ -401,7 +401,7 @@ EOF;
                 } elseif ($value instanceof \Closure) {
                     try {
                         yield $key => $f($key, $value(), true);
-                    } catch (\Throwable $e) {
+                    } catch (\Throwable) {
                         yield $key => $f($key, null, false);
                     }
                 } else {

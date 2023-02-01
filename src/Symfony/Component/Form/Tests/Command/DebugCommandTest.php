@@ -52,7 +52,7 @@ Service form types
 
 
 TXT
-        , $tester->getDisplay(true));
+            , $tester->getDisplay(true));
     }
 
     public function testDebugSingleFormType()
@@ -134,7 +134,7 @@ Select one of the following form types to display its information: [%A\A\Ambiguo
 %A\A\AmbiguousType (Block prefix: "ambiguous")
 %A
 TXT
-        , $output);
+            , $output);
     }
 
     public function testDebugInvalidFormType()
@@ -189,10 +189,6 @@ TXT
      */
     public function testComplete(array $input, array $expectedSuggestions)
     {
-        if (!class_exists(CommandCompletionTester::class)) {
-            $this->markTestSkipped('Test command completion requires symfony/console 5.4+.');
-        }
-
         $formRegistry = new FormRegistry([], new ResolvedFormTypeFactory());
         $command = new DebugCommand($formRegistry);
         $application = new Application();
@@ -210,7 +206,7 @@ TXT
 
         yield 'form_type' => [
             [''],
-            $this->getCoreTypes(),
+            self::getCoreTypes(),
         ];
 
         yield 'option for FQCN' => [
@@ -229,6 +225,7 @@ TXT
                 'translation_domain',
                 'auto_initialize',
                 'priority',
+                'form_attr',
             ],
         ];
 
@@ -248,6 +245,7 @@ TXT
                 'translation_domain',
                 'auto_initialize',
                 'priority',
+                'form_attr',
             ],
         ];
 
@@ -262,7 +260,7 @@ TXT
         ];
     }
 
-    private function getCoreTypes(): array
+    private static function getCoreTypes(): array
     {
         $coreExtension = new CoreExtension();
         $loadTypesRefMethod = (new \ReflectionObject($coreExtension))->getMethod('loadTypes');

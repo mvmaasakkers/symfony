@@ -220,7 +220,7 @@ class YamlFileLoader extends FileLoader
         }
     }
 
-    private function parseDefinitions(array $content, string $file)
+    private function parseDefinitions(array $content, string $file, bool $trackBindings = true)
     {
         if (!isset($content['services'])) {
             return;
@@ -246,14 +246,14 @@ class YamlFileLoader extends FileLoader
                 if (\is_string($service) && str_starts_with($service, '@')) {
                     throw new InvalidArgumentException(sprintf('Type definition "%s" cannot be an alias within "_instanceof" in "%s". Check your YAML syntax.', $id, $file));
                 }
-                $this->parseDefinition($id, $service, $file, []);
+                $this->parseDefinition($id, $service, $file, [], false, $trackBindings);
             }
         }
 
         $this->isLoadingInstanceof = false;
         $defaults = $this->parseDefaults($content, $file);
         foreach ($content['services'] as $id => $service) {
-            $this->parseDefinition($id, $service, $file, $defaults);
+            $this->parseDefinition($id, $service, $file, $defaults, false, $trackBindings);
         }
     }
 
@@ -304,7 +304,7 @@ class YamlFileLoader extends FileLoader
                 }
 
                 foreach ($tag as $attribute => $value) {
-                    if (!is_scalar($value) && null !== $value) {
+                    if (!\is_scalar($value) && null !== $value) {
                         throw new InvalidArgumentException(sprintf('Tag "%s", attribute "%s" in "_defaults" must be of a scalar-type in "%s". Check your YAML syntax.', $name, $attribute, $file));
                     }
                 }
@@ -338,7 +338,7 @@ class YamlFileLoader extends FileLoader
     /**
      * @throws InvalidArgumentException When tags are invalid
      */
-    private function parseDefinition(string $id, array|string|null $service, string $file, array $defaults, bool $return = false)
+    private function parseDefinition(string $id, array|string|null $service, string $file, array $defaults, bool $return = false, bool $trackBindings = true)
     {
         if (preg_match('/^_[a-zA-Z0-9_]*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Service names that start with an underscore are reserved. Rename the "%s" service or define it in XML instead.', $id));
@@ -612,7 +612,7 @@ class YamlFileLoader extends FileLoader
             }
 
             foreach ($tag as $attribute => $value) {
-                if (!is_scalar($value) && null !== $value) {
+                if (!\is_scalar($value) && null !== $value) {
                     throw new InvalidArgumentException(sprintf('A "tags" attribute must be of a scalar-type for service "%s", tag "%s", attribute "%s" in "%s". Check your YAML syntax.', $id, $name, $attribute, $file));
                 }
             }
@@ -662,7 +662,7 @@ class YamlFileLoader extends FileLoader
                 $bindingType = $this->isLoadingInstanceof ? BoundArgument::INSTANCEOF_BINDING : BoundArgument::SERVICE_BINDING;
                 foreach ($bindings as $argument => $value) {
                     if (!$value instanceof BoundArgument) {
-                        $bindings[$argument] = new BoundArgument($value, true, $bindingType, $file);
+                        $bindings[$argument] = new BoundArgument($value, $trackBindings, $bindingType, $file);
                     }
                 }
             }
@@ -704,6 +704,17 @@ class YamlFileLoader extends FileLoader
     private function parseCallable(mixed $callable, string $parameter, string $id, string $file): string|array|Reference
     {
         if (\is_string($callable)) {
+            if (str_starts_with($callable, '@=')) {
+                if ('factory' !== $parameter) {
+                    throw new InvalidArgumentException(sprintf('Using expressions in "%s" for the "%s" service is not supported in "%s".', $parameter, $id, $file));
+                }
+                if (!class_exists(Expression::class)) {
+                    throw new \LogicException('The "@=" expression syntax cannot be used without the ExpressionLanguage component. Try running "composer require symfony/expression-language".');
+                }
+
+                return $callable;
+            }
+
             if ('' !== $callable && '@' === $callable[0]) {
                 if (!str_contains($callable, ':')) {
                     return [$this->resolveServices($callable, $file), '__invoke'];
@@ -793,23 +804,24 @@ class YamlFileLoader extends FileLoader
     {
         if ($value instanceof TaggedValue) {
             $argument = $value->getValue();
+
+            if ('closure' === $value->getTag()) {
+                $argument = $this->resolveServices($argument, $file, $isParameter);
+
+                return (new Definition('Closure'))
+                    ->setFactory(['Closure', 'fromCallable'])
+                    ->addArgument($argument);
+            }
             if ('iterator' === $value->getTag()) {
                 if (!\is_array($argument)) {
                     throw new InvalidArgumentException(sprintf('"!iterator" tag only accepts sequences in "%s".', $file));
                 }
                 $argument = $this->resolveServices($argument, $file, $isParameter);
-                try {
-                    return new IteratorArgument($argument);
-                } catch (InvalidArgumentException $e) {
-                    throw new InvalidArgumentException(sprintf('"!iterator" tag only accepts arrays of "@service" references in "%s".', $file));
-                }
+
+                return new IteratorArgument($argument);
             }
             if ('service_closure' === $value->getTag()) {
                 $argument = $this->resolveServices($argument, $file, $isParameter);
-
-                if (!$argument instanceof Reference) {
-                    throw new InvalidArgumentException(sprintf('"!service_closure" tag only accepts service references in "%s".', $file));
-                }
 
                 return new ServiceClosureArgument($argument);
             }
@@ -820,11 +832,7 @@ class YamlFileLoader extends FileLoader
 
                 $argument = $this->resolveServices($argument, $file, $isParameter);
 
-                try {
-                    return new ServiceLocatorArgument($argument);
-                } catch (InvalidArgumentException $e) {
-                    throw new InvalidArgumentException(sprintf('"!service_locator" tag only accepts maps of "@service" references in "%s".', $file));
-                }
+                return new ServiceLocatorArgument($argument);
             }
             if (\in_array($value->getTag(), ['tagged', 'tagged_iterator', 'tagged_locator'], true)) {
                 $forLocator = 'tagged_locator' === $value->getTag();

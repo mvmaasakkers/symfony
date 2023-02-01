@@ -19,7 +19,7 @@ use Symfony\Component\DomCrawler\Link;
 
 abstract class AbstractCrawlerTest extends TestCase
 {
-    abstract public function getDoctype(): string;
+    abstract public static function getDoctype(): string;
 
     protected function createCrawler($node = null, string $uri = null, string $baseHref = null)
     {
@@ -129,7 +129,7 @@ abstract class AbstractCrawlerTest extends TestCase
     public function testAddHtmlContentCharsetGbk()
     {
         $crawler = $this->createCrawler();
-        //gbk encode of <html><p>中文</p></html>
+        // gbk encode of <html><p>中文</p></html>
         $crawler->addHtmlContent($this->getDoctype().base64_decode('PGh0bWw+PHA+1tDOxDwvcD48L2h0bWw+'), 'gbk');
 
         $this->assertEquals('中文', $crawler->filterXPath('//p')->text());
@@ -369,6 +369,13 @@ abstract class AbstractCrawlerTest extends TestCase
         }
 
         $this->assertSame('my value', $this->createTestCrawler(null)->filterXPath('//ol')->html('my value'));
+    }
+
+    public function testEmojis()
+    {
+        $crawler = $this->createCrawler('<body><p>Hey 👋</p></body>');
+
+        $this->assertSame('<body><p>Hey 👋</p></body>', $crawler->html());
     }
 
     public function testExtract()
@@ -1053,8 +1060,6 @@ HTML;
             $crawler = $this->createCrawler('<p></p>');
             $crawler->filter('p')->children();
             $this->assertTrue(true, '->children() does not trigger a notice if the node has no children');
-        } catch (\PHPUnit\Framework\Error\Notice $e) {
-            $this->fail('->children() does not trigger a notice if the node has no children');
         } catch (\PHPUnit\Framework\Error\Notice $e) {
             $this->fail('->children() does not trigger a notice if the node has no children');
         }

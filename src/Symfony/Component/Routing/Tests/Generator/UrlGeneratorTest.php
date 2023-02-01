@@ -527,6 +527,13 @@ class UrlGeneratorTest extends TestCase
         $this->assertSame('/app.php/dir/foo/bar%2Fbaz/dir2', $this->getGenerator($routes)->generate('test', ['path' => 'foo/bar%2Fbaz']));
     }
 
+    public function testEncodingOfSlashInQueryParameters()
+    {
+        $routes = $this->getRoutes('test', new Route('/get'));
+        $this->assertSame('/app.php/get?query=foo/bar', $this->getGenerator($routes)->generate('test', ['query' => 'foo/bar']));
+        $this->assertSame('/app.php/get?query=foo%2Fbar', $this->getGenerator($routes)->generate('test', ['query' => 'foo%2Fbar']));
+    }
+
     public function testAdjacentVariables()
     {
         $routes = $this->getRoutes('test', new Route('/{x}{y}{z}.{_format}', ['z' => 'default-z', '_format' => 'html'], ['y' => '\d+']));
@@ -765,7 +772,7 @@ class UrlGeneratorTest extends TestCase
             ['author' => 'bernhard', 'article' => 'forms-are-great'], UrlGeneratorInterface::RELATIVE_PATH)
         );
         $this->assertSame('https://example.com/app.php/bernhard/blog', $generator->generate('scheme',
-                ['author' => 'bernhard'], UrlGeneratorInterface::RELATIVE_PATH)
+            ['author' => 'bernhard'], UrlGeneratorInterface::RELATIVE_PATH)
         );
         $this->assertSame('../../about', $generator->generate('unrelated',
             [], UrlGeneratorInterface::RELATIVE_PATH)

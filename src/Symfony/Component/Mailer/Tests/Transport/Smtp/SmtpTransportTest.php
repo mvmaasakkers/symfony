@@ -13,6 +13,7 @@ namespace Symfony\Component\Mailer\Tests\Transport\Smtp;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\Exception\LogicException;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\Transport\Smtp\SmtpTransport;
 use Symfony\Component\Mailer\Transport\Smtp\Stream\AbstractStream;
@@ -134,6 +135,35 @@ class SmtpTransportTest extends TestCase
         $this->assertContains("RCPT TO:<recipient2@example.org>\r\n", $stream->getCommands());
     }
 
+    public function testAssertResponseCodeNoCodes()
+    {
+        $this->expectException(LogicException::class);
+        $this->invokeAssertResponseCode('response', []);
+    }
+
+    public function testAssertResponseCodeWithEmptyResponse()
+    {
+        $this->expectException(TransportException::class);
+        $this->expectExceptionMessage('Expected response code "220" but got empty code.');
+        $this->invokeAssertResponseCode('', [220]);
+    }
+
+    public function testAssertResponseCodeWithNotValidCode()
+    {
+        $this->expectException(TransportException::class);
+        $this->expectExceptionMessage('Expected response code "220" but got code "550", with message "550 Access Denied".');
+        $this->expectExceptionCode(550);
+        $this->invokeAssertResponseCode('550 Access Denied', [220]);
+    }
+
+    private function invokeAssertResponseCode(string $response, array $codes): void
+    {
+        $transport = new SmtpTransport($this->getMockForAbstractClass(AbstractStream::class));
+        $m = new \ReflectionMethod($transport, 'assertResponseCode');
+        $m->setAccessible(true);
+        $m->invoke($transport, $response, $codes);
+    }
+
     public function testStop()
     {
         $stream = new DummyStream();
@@ -145,89 +175,5 @@ class SmtpTransportTest extends TestCase
 
         $transport->stop();
         $this->assertTrue($stream->isClosed());
-    }
-}
-
-class DummyStream extends AbstractStream
-{
-    /**
-     * @var string
-     */
-    private $nextResponse;
-
-    /**
-     * @var string[]
-     */
-    private $commands;
-
-    /**
-     * @var bool
-     */
-    private $closed = true;
-
-    public function initialize(): void
-    {
-        $this->closed = false;
-        $this->nextResponse = '220 localhost';
-    }
-
-    public function write(string $bytes, $debug = true): void
-    {
-        if ($this->closed) {
-            throw new TransportException('Unable to write bytes on the wire.');
-        }
-
-        $this->commands[] = $bytes;
-
-        if (str_starts_with($bytes, 'DATA')) {
-            $this->nextResponse = '354 Enter message, ending with "." on a line by itself';
-        } elseif (str_starts_with($bytes, 'QUIT')) {
-            $this->nextResponse = '221 Goodbye';
-        } else {
-            $this->nextResponse = '250 OK';
-        }
-    }
-
-    public function readLine(): string
-    {
-        return $this->nextResponse;
-    }
-
-    public function flush(): void
-    {
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getCommands(): array
-    {
-        return $this->commands;
-    }
-
-    public function clearCommands(): void
-    {
-        $this->commands = [];
-    }
-
-    protected function getReadConnectionDescription(): string
-    {
-        return 'null';
-    }
-
-    public function close(): void
-    {
-        $this->closed = true;
-    }
-
-    public function isClosed(): bool
-    {
-        return $this->closed;
-    }
-
-    public function terminate(): void
-    {
-        parent::terminate();
-        $this->closed = true;
     }
 }

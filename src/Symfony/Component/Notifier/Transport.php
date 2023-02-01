@@ -15,6 +15,7 @@ use Symfony\Component\Notifier\Bridge\AllMySms\AllMySmsTransportFactory;
 use Symfony\Component\Notifier\Bridge\AmazonSns\AmazonSnsTransportFactory;
 use Symfony\Component\Notifier\Bridge\Clickatell\ClickatellTransportFactory;
 use Symfony\Component\Notifier\Bridge\Discord\DiscordTransportFactory;
+use Symfony\Component\Notifier\Bridge\Engagespot\EngagespotTransportFactory;
 use Symfony\Component\Notifier\Bridge\Esendex\EsendexTransportFactory;
 use Symfony\Component\Notifier\Bridge\Expo\ExpoTransportFactory;
 use Symfony\Component\Notifier\Bridge\Firebase\FirebaseTransportFactory;
@@ -35,6 +36,7 @@ use Symfony\Component\Notifier\Bridge\Octopush\OctopushTransportFactory;
 use Symfony\Component\Notifier\Bridge\OrangeSms\OrangeSmsTransportFactory;
 use Symfony\Component\Notifier\Bridge\OvhCloud\OvhCloudTransportFactory;
 use Symfony\Component\Notifier\Bridge\RocketChat\RocketChatTransportFactory;
+use Symfony\Component\Notifier\Bridge\Sendberry\SendberryTransportFactory;
 use Symfony\Component\Notifier\Bridge\Sendinblue\SendinblueTransportFactory;
 use Symfony\Component\Notifier\Bridge\Sinch\SinchTransportFactory;
 use Symfony\Component\Notifier\Bridge\Slack\SlackTransportFactory;
@@ -70,6 +72,7 @@ final class Transport
         AmazonSnsTransportFactory::class,
         ClickatellTransportFactory::class,
         DiscordTransportFactory::class,
+        EngagespotTransportFactory::class,
         EsendexTransportFactory::class,
         ExpoTransportFactory::class,
         FirebaseTransportFactory::class,
@@ -90,6 +93,7 @@ final class Transport
         OrangeSmsTransportFactory::class,
         OvhCloudTransportFactory::class,
         RocketChatTransportFactory::class,
+        SendberryTransportFactory::class,
         SendinblueTransportFactory::class,
         SinchTransportFactory::class,
         SlackTransportFactory::class,

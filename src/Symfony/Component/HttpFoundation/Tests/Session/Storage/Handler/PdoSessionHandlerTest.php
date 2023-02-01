@@ -147,7 +147,7 @@ class PdoSessionHandlerTest extends TestCase
 
     public function testReadLockedConvertsStreamToString()
     {
-        if (filter_var(ini_get('session.use_strict_mode'), \FILTER_VALIDATE_BOOLEAN)) {
+        if (filter_var(\ini_get('session.use_strict_mode'), \FILTER_VALIDATE_BOOLEAN)) {
             $this->markTestSkipped('Strict mode needs no locking for new sessions.');
         }
 
@@ -343,6 +343,21 @@ class PdoSessionHandlerTest extends TestCase
         yield ['sqlite://localhost/:memory:', 'sqlite::memory:'];
         yield ['mssql://localhost/test', 'sqlsrv:server=localhost;Database=test'];
         yield ['mssql://localhost:56/test', 'sqlsrv:server=localhost,56;Database=test'];
+    }
+
+    public function testTtl()
+    {
+        foreach ([60, fn () => 60] as $ttl) {
+            $pdo = $this->getMemorySqlitePdo();
+            $storage = new PdoSessionHandler($pdo, ['ttl' => $ttl]);
+
+            $storage->open('', 'sid');
+            $storage->read('id');
+            $storage->write('id', 'data');
+            $storage->close();
+
+            $this->assertEqualsWithDelta(time() + 60, $pdo->query('SELECT sess_lifetime FROM sessions')->fetchColumn(), 5);
+        }
     }
 
     /**

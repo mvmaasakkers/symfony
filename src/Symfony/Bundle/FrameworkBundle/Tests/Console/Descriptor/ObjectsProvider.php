@@ -138,6 +138,7 @@ class ObjectsProvider
     {
         $definition1 = new Definition('Full\\Qualified\\Class1');
         $definition2 = new Definition('Full\\Qualified\\Class2');
+        $definition3 = new Definition('Full\\Qualified\\Class3');
 
         return [
             'definition_1' => $definition1
@@ -170,6 +171,9 @@ class ObjectsProvider
                 ->addTag('tag2')
                 ->addMethodCall('setMailer', [new Reference('mailer')])
                 ->setFactory([new Reference('factory.service'), 'get']),
+            '.definition_3' => $definition3
+                ->setFile('/path/to/file')
+                ->setFactory([new Definition('Full\\Qualified\\FactoryClass'), 'get']),
             'definition_without_class' => new Definition(),
         ];
     }
@@ -245,17 +249,23 @@ class ObjectsProvider
         return ['event_dispatcher_1' => $eventDispatcher];
     }
 
-    public static function getCallables()
+    public static function getCallables(): array
     {
         return [
             'callable_1' => 'array_key_exists',
             'callable_2' => ['Symfony\\Bundle\\FrameworkBundle\\Tests\\Console\\Descriptor\\CallableClass', 'staticMethod'],
             'callable_3' => [new CallableClass(), 'method'],
             'callable_4' => 'Symfony\\Bundle\\FrameworkBundle\\Tests\\Console\\Descriptor\\CallableClass::staticMethod',
-            'callable_5' => ['Symfony\\Bundle\\FrameworkBundle\\Tests\\Console\\Descriptor\\ExtendedCallableClass', 'parent::staticMethod'],
             'callable_6' => function () { return 'Closure'; },
             'callable_7' => new CallableClass(),
             'callable_from_callable' => (new CallableClass())(...),
+        ];
+    }
+
+    public static function getDeprecatedCallables(): array
+    {
+        return [
+            'callable_5' => ['Symfony\\Bundle\\FrameworkBundle\\Tests\\Console\\Descriptor\\ExtendedCallableClass', 'parent::staticMethod'],
         ];
     }
 }

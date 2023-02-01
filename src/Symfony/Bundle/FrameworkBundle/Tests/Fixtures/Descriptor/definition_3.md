@@ -1,0 +1,11 @@
+- Class: `Full\Qualified\Class3`
+- Public: no
+- Synthetic: no
+- Lazy: no
+- Shared: yes
+- Abstract: no
+- Autowired: no
+- Autoconfigured: no
+- File: `/path/to/file`
+- Factory Service: inline factory service (`Full\Qualified\FactoryClass`)
+- Factory Method: `get`

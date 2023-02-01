@@ -136,6 +136,33 @@ class ParserTest extends TestCase
                 new Node\BinaryNode('matches', new Node\ConstantNode('foo'), new Node\ConstantNode('/foo/')),
                 '"foo" matches "/foo/"',
             ],
+            [
+                new Node\BinaryNode('starts with', new Node\ConstantNode('foo'), new Node\ConstantNode('f')),
+                '"foo" starts with "f"',
+            ],
+            [
+                new Node\BinaryNode('ends with', new Node\ConstantNode('foo'), new Node\ConstantNode('f')),
+                '"foo" ends with "f"',
+            ],
+            [
+                new Node\BinaryNode('contains', new Node\ConstantNode('foo'), new Node\ConstantNode('f')),
+                '"foo" contains "f"',
+            ],
+            [
+                new Node\GetAttrNode(new Node\NameNode('foo'), new Node\ConstantNode('bar', true, true), new Node\ArgumentsNode(), Node\GetAttrNode::PROPERTY_CALL),
+                'foo?.bar',
+                ['foo'],
+            ],
+            [
+                new Node\GetAttrNode(new Node\NameNode('foo'), new Node\ConstantNode('bar', true, true), new Node\ArgumentsNode(), Node\GetAttrNode::METHOD_CALL),
+                'foo?.bar()',
+                ['foo'],
+            ],
+            [
+                new Node\GetAttrNode(new Node\NameNode('foo'), new Node\ConstantNode('not', true, true), new Node\ArgumentsNode(), Node\GetAttrNode::METHOD_CALL),
+                'foo?.not()',
+                ['foo'],
+            ],
 
             // chained calls
             [
@@ -267,6 +294,10 @@ class ParserTest extends TestCase
         return [
             'valid expression' => [
                 'expression' => 'foo["some_key"].callFunction(a ? b)',
+                'names' => ['foo', 'a', 'b'],
+            ],
+            'valid expression with null safety' => [
+                'expression' => 'foo["some_key"]?.callFunction(a ? b)',
                 'names' => ['foo', 'a', 'b'],
             ],
             'allow expression without names' => [

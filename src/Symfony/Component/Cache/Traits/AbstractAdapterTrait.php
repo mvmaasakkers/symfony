@@ -170,7 +170,7 @@ trait AbstractAdapterTrait
             if ($this->doDelete($ids)) {
                 return true;
             }
-        } catch (\Exception $e) {
+        } catch (\Exception) {
         }
 
         $ok = true;
@@ -373,7 +373,7 @@ trait AbstractAdapterTrait
         $this->ids[$key] = $key;
 
         if (\count($this->ids) > 1000) {
-            array_splice($this->ids, 0, 500); // stop memory leak if there are many keys
+            $this->ids = \array_slice($this->ids, 500, null, true); // stop memory leak if there are many keys
         }
 
         if (null === $this->maxIdLength) {

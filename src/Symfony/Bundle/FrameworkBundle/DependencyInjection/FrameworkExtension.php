@@ -11,6 +11,7 @@
 
 namespace Symfony\Bundle\FrameworkBundle\DependencyInjection;
 
+use Composer\InstalledVersions;
 use Doctrine\Common\Annotations\AnnotationRegistry;
 use Doctrine\Common\Annotations\Reader;
 use Http\Client\HttpClient;
@@ -67,10 +68,14 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Form\ChoiceList\Factory\CachingFactoryDecorator;
+use Symfony\Component\Form\Extension\HtmlSanitizer\Type\TextTypeHtmlSanitizerExtension;
 use Symfony\Component\Form\Form;
 use Symfony\Component\Form\FormTypeExtensionInterface;
 use Symfony\Component\Form\FormTypeGuesserInterface;
 use Symfony\Component\Form\FormTypeInterface;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerInterface;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Retry\GenericRetryStrategy;
 use Symfony\Component\HttpClient\RetryableHttpClient;
@@ -108,6 +113,7 @@ use Symfony\Component\Messenger\Handler\MessageHandlerInterface;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\RouterContextMiddleware;
+use Symfony\Component\Messenger\Stamp\SerializedMessageStamp;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 use Symfony\Component\Messenger\Transport\TransportFactoryInterface;
 use Symfony\Component\Messenger\Transport\TransportInterface;
@@ -118,6 +124,7 @@ use Symfony\Component\Notifier\Bridge\AllMySms\AllMySmsTransportFactory;
 use Symfony\Component\Notifier\Bridge\AmazonSns\AmazonSnsTransportFactory;
 use Symfony\Component\Notifier\Bridge\Clickatell\ClickatellTransportFactory;
 use Symfony\Component\Notifier\Bridge\Discord\DiscordTransportFactory;
+use Symfony\Component\Notifier\Bridge\Engagespot\EngagespotTransportFactory;
 use Symfony\Component\Notifier\Bridge\Esendex\EsendexTransportFactory;
 use Symfony\Component\Notifier\Bridge\Expo\ExpoTransportFactory;
 use Symfony\Component\Notifier\Bridge\FakeChat\FakeChatTransportFactory;
@@ -145,6 +152,7 @@ use Symfony\Component\Notifier\Bridge\OneSignal\OneSignalTransportFactory;
 use Symfony\Component\Notifier\Bridge\OrangeSms\OrangeSmsTransportFactory;
 use Symfony\Component\Notifier\Bridge\OvhCloud\OvhCloudTransportFactory;
 use Symfony\Component\Notifier\Bridge\RocketChat\RocketChatTransportFactory;
+use Symfony\Component\Notifier\Bridge\Sendberry\SendberryTransportFactory;
 use Symfony\Component\Notifier\Bridge\Sendinblue\SendinblueTransportFactory as SendinblueNotifierTransportFactory;
 use Symfony\Component\Notifier\Bridge\Sinch\SinchTransportFactory;
 use Symfony\Component\Notifier\Bridge\Slack\SlackTransportFactory;
@@ -160,8 +168,10 @@ use Symfony\Component\Notifier\Bridge\Twilio\TwilioTransportFactory;
 use Symfony\Component\Notifier\Bridge\Vonage\VonageTransportFactory;
 use Symfony\Component\Notifier\Bridge\Yunpian\YunpianTransportFactory;
 use Symfony\Component\Notifier\Bridge\Zulip\ZulipTransportFactory;
+use Symfony\Component\Notifier\ChatterInterface;
 use Symfony\Component\Notifier\Notifier;
 use Symfony\Component\Notifier\Recipient\Recipient;
+use Symfony\Component\Notifier\TexterInterface;
 use Symfony\Component\Notifier\Transport\TransportFactoryInterface as NotifierTransportFactoryInterface;
 use Symfony\Component\PropertyAccess\PropertyAccessor;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
@@ -182,6 +192,10 @@ use Symfony\Component\Routing\Loader\AnnotationFileLoader;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Security;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Semaphore\PersistingStoreInterface as SemaphoreStoreInterface;
+use Symfony\Component\Semaphore\Semaphore;
+use Symfony\Component\Semaphore\SemaphoreFactory;
+use Symfony\Component\Semaphore\Store\StoreFactory as SemaphoreStoreFactory;
 use Symfony\Component\Serializer\Encoder\DecoderInterface;
 use Symfony\Component\Serializer\Encoder\EncoderInterface;
 use Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader;
@@ -197,6 +211,7 @@ use Symfony\Component\Translation\Bridge\Crowdin\CrowdinProviderFactory;
 use Symfony\Component\Translation\Bridge\Loco\LocoProviderFactory;
 use Symfony\Component\Translation\Bridge\Lokalise\LokaliseProviderFactory;
 use Symfony\Component\Translation\Command\XliffLintCommand as BaseXliffLintCommand;
+use Symfony\Component\Translation\LocaleSwitcher;
 use Symfony\Component\Translation\PseudoLocalizationTranslator;
 use Symfony\Component\Translation\Translator;
 use Symfony\Component\Uid\Factory\UuidFactory;
@@ -234,6 +249,7 @@ class FrameworkExtension extends Extension
     private bool $mailerConfigEnabled = false;
     private bool $httpClientConfigEnabled = false;
     private bool $notifierConfigEnabled = false;
+    private bool $serializerConfigEnabled = false;
     private bool $propertyAccessConfigEnabled = false;
     private static bool $lockConfigEnabled = false;
 
@@ -245,6 +261,10 @@ class FrameworkExtension extends Extension
     public function load(array $configs, ContainerBuilder $container)
     {
         $loader = new PhpFileLoader($container, new FileLocator(\dirname(__DIR__).'/Resources/config'));
+
+        if (class_exists(InstalledVersions::class) && InstalledVersions::isInstalled('symfony/symfony') && 'symfony/symfony' !== (InstalledVersions::getRootPackage()['name'] ?? '')) {
+            trigger_deprecation('symfony/symfony', '6.1', 'Requiring the "symfony/symfony" package is deprecated; replace it with standalone components instead.');
+        }
 
         $loader->load('web.php');
 
@@ -322,6 +342,7 @@ class FrameworkExtension extends Extension
         }
 
         $container->setParameter('kernel.http_method_override', $config['http_method_override']);
+        $container->setParameter('kernel.trust_x_sendfile_type_header', $config['trust_x_sendfile_type_header']);
         $container->setParameter('kernel.trusted_hosts', $config['trusted_hosts']);
         $container->setParameter('kernel.default_locale', $config['default_locale']);
         $container->setParameter('kernel.enabled_locales', $config['enabled_locales']);
@@ -379,7 +400,7 @@ class FrameworkExtension extends Extension
 
         $container->getDefinition('exception_listener')->replaceArgument(3, $config['exceptions']);
 
-        if ($this->isConfigEnabled($container, $config['serializer'])) {
+        if ($this->serializerConfigEnabled = $this->isConfigEnabled($container, $config['serializer'])) {
             if (!class_exists(\Symfony\Component\Serializer\Serializer::class)) {
                 throw new LogicException('Serializer support cannot be enabled as the Serializer component is not installed. Try running "composer require symfony/serializer-pack".');
             }
@@ -393,6 +414,10 @@ class FrameworkExtension extends Extension
 
         if (self::$lockConfigEnabled = $this->isConfigEnabled($container, $config['lock'])) {
             $this->registerLockConfiguration($config['lock'], $container, $loader);
+        }
+
+        if ($this->isConfigEnabled($container, $config['semaphore'])) {
+            $this->registerSemaphoreConfiguration($config['semaphore'], $container, $loader);
         }
 
         if ($this->isConfigEnabled($container, $config['rate_limiter'])) {
@@ -463,6 +488,9 @@ class FrameworkExtension extends Extension
                 $container->removeDefinition('form.type_extension.form.validator');
                 $container->removeDefinition('form.type_guesser.validator');
             }
+            if (!$this->isConfigEnabled($container, $config['html_sanitizer']) || !class_exists(TextTypeHtmlSanitizerExtension::class)) {
+                $container->removeDefinition('form.type_extension.form.html_sanitizer');
+            }
         } else {
             $container->removeDefinition('console.command.form_debug');
         }
@@ -509,8 +537,16 @@ class FrameworkExtension extends Extension
             $this->registerNotifierConfiguration($config['notifier'], $container, $loader);
         }
 
-        // profiler depends on form, validation, translation, messenger, mailer, http-client, notifier being registered
+        // profiler depends on form, validation, translation, messenger, mailer, http-client, notifier, serializer being registered
         $this->registerProfilerConfiguration($config['profiler'], $container, $loader);
+
+        if ($this->isConfigEnabled($container, $config['html_sanitizer'])) {
+            if (!class_exists(HtmlSanitizerConfig::class)) {
+                throw new LogicException('HtmlSanitizer support cannot be enabled as the HtmlSanitizer component is not installed. Try running "composer require symfony/html-sanitizer".');
+            }
+
+            $this->registerHtmlSanitizerConfiguration($config['html_sanitizer'], $container, $loader);
+        }
 
         $this->addAnnotatedClassesToCompile([
             '**\\Controller\\',
@@ -616,13 +652,30 @@ class FrameworkExtension extends Extension
         $container->registerAttributeForAutoconfiguration(AsController::class, static function (ChildDefinition $definition, AsController $attribute): void {
             $definition->addTag('controller.service_arguments');
         });
-        $container->registerAttributeForAutoconfiguration(AsMessageHandler::class, static function (ChildDefinition $definition, AsMessageHandler $attribute): void {
-            $tagAttributes = get_object_vars($attribute);
-            $tagAttributes['from_transport'] = $tagAttributes['fromTransport'];
-            unset($tagAttributes['fromTransport']);
 
-            $definition->addTag('messenger.message_handler', $tagAttributes);
-        });
+        if (class_exists(SerializedMessageStamp::class)) {
+            // symfony/messenger >= 6.1
+            $container->registerAttributeForAutoconfiguration(AsMessageHandler::class, static function (ChildDefinition $definition, AsMessageHandler $attribute, \ReflectionClass|\ReflectionMethod $reflector): void {
+                $tagAttributes = get_object_vars($attribute);
+                $tagAttributes['from_transport'] = $tagAttributes['fromTransport'];
+                unset($tagAttributes['fromTransport']);
+                if ($reflector instanceof \ReflectionMethod) {
+                    if (isset($tagAttributes['method'])) {
+                        throw new LogicException(sprintf('AsMessageHandler attribute cannot declare a method on "%s::%s()".', $reflector->class, $reflector->name));
+                    }
+                    $tagAttributes['method'] = $reflector->getName();
+                }
+                $definition->addTag('messenger.message_handler', $tagAttributes);
+            });
+        } else {
+            // symfony/messenger < 6.1
+            $container->registerAttributeForAutoconfiguration(AsMessageHandler::class, static function (ChildDefinition $definition, AsMessageHandler $attribute): void {
+                $tagAttributes = get_object_vars($attribute);
+                $tagAttributes['from_transport'] = $tagAttributes['fromTransport'];
+                unset($tagAttributes['fromTransport']);
+                $definition->addTag('messenger.message_handler', $tagAttributes);
+            });
+        }
 
         if (!$container->getParameter('kernel.debug')) {
             // remove tagged iterator argument for resource checkers
@@ -637,6 +690,8 @@ class FrameworkExtension extends Extension
             ->addTag('routing.route_loader');
 
         $container->setParameter('container.behavior_describing_tags', [
+            'annotations.cached_reader',
+            'container.do_not_inline',
             'container.service_locator',
             'container.service_subscriber',
             'kernel.event_subscriber',
@@ -668,6 +723,10 @@ class FrameworkExtension extends Extension
         }
 
         if ($this->isConfigEnabled($container, $config['form']['csrf_protection'])) {
+            if (!$container->hasDefinition('security.csrf.token_generator')) {
+                throw new \LogicException('To use form CSRF protection, "framework.csrf_protection" must be enabled.');
+            }
+
             $loader->load('form_csrf.php');
 
             $container->setParameter('form.type_extension.csrf.enabled', true);
@@ -784,6 +843,10 @@ class FrameworkExtension extends Extension
 
         if ($this->notifierConfigEnabled) {
             $loader->load('notifier_debug.php');
+        }
+
+        if ($this->serializerConfigEnabled && $config['collect_serializer_data']) {
+            $loader->load('serializer_debug.php');
         }
 
         $container->setParameter('profiler_listener.only_exceptions', $config['only_exceptions']);
@@ -916,7 +979,7 @@ class FrameworkExtension extends Extension
             if (isset($workflow['marking_store']['type'])) {
                 $markingStoreDefinition = new ChildDefinition('workflow.marking_store.method');
                 $markingStoreDefinition->setArguments([
-                    'state_machine' === $type, //single state
+                    'state_machine' === $type, // single state
                     $workflow['marking_store']['property'],
                 ]);
             } elseif (isset($workflow['marking_store']['service'])) {
@@ -1263,6 +1326,11 @@ class FrameworkExtension extends Extension
         }
 
         $loader->load('translation.php');
+
+        if (!ContainerBuilder::willBeAvailable('symfony/translation', LocaleSwitcher::class, ['symfony/framework-bundle'])) {
+            $container->removeDefinition('translation.locale_switcher');
+        }
+
         $loader->load('translation_providers.php');
 
         // Use the "real" translator instead of the identity default
@@ -1577,9 +1645,16 @@ class FrameworkExtension extends Extension
 
         $loader->load('annotations.php');
 
+        // registerUniqueLoader exists since doctrine/annotations v1.6
         if (!method_exists(AnnotationRegistry::class, 'registerUniqueLoader')) {
-            $container->getDefinition('annotations.dummy_registry')
-                ->setMethodCalls([['registerLoader', ['class_exists']]]);
+            // registerLoader exists only in doctrine/annotations v1
+            if (method_exists(AnnotationRegistry::class, 'registerLoader')) {
+                $container->getDefinition('annotations.dummy_registry')
+                    ->setMethodCalls([['registerLoader', ['class_exists']]]);
+            } else {
+                // remove the dummy registry when doctrine/annotations v2 is used
+                $container->removeDefinition('annotations.dummy_registry');
+            }
         }
 
         if ('none' === $config['cache']) {
@@ -1611,9 +1686,8 @@ class FrameworkExtension extends Extension
         $container
             ->getDefinition('annotations.cached_reader')
             ->replaceArgument(2, $config['debug'])
-            // temporary property to lazy-reference the cache provider without using it until AddAnnotationsCachedReaderPass runs
-            ->setProperty('cacheProviderBackup', new ServiceClosureArgument(new Reference($cacheService)))
-            ->addTag('annotations.cached_reader')
+            // reference the cache provider without using it until AddAnnotationsCachedReaderPass runs
+            ->addArgument(new ServiceClosureArgument(new Reference($cacheService)))
         ;
 
         $container->setAlias('annotation_reader', 'annotations.cached_reader');
@@ -1841,11 +1915,11 @@ class FrameworkExtension extends Extension
 
             // Generate stores
             $storeDefinitions = [];
-            foreach ($resourceStores as $storeDsn) {
-                $storeDsn = $container->resolveEnvPlaceholders($storeDsn, null, $usedEnvs);
+            foreach ($resourceStores as $resourceStore) {
+                $storeDsn = $container->resolveEnvPlaceholders($resourceStore, null, $usedEnvs);
                 $storeDefinition = new Definition(PersistingStoreInterface::class);
                 $storeDefinition->setFactory([StoreFactory::class, 'createStore']);
-                $storeDefinition->setArguments([$storeDsn]);
+                $storeDefinition->setArguments([$resourceStore]);
 
                 $container->setDefinition($storeDefinitionId = '.lock.'.$resourceName.'.store.'.$container->hash($storeDsn), $storeDefinition);
 
@@ -1872,6 +1946,39 @@ class FrameworkExtension extends Extension
                 $container->setAlias(LockFactory::class, new Alias('lock.factory', false));
             } else {
                 $container->registerAliasForArgument('lock.'.$resourceName.'.factory', LockFactory::class, $resourceName.'.lock.factory');
+            }
+        }
+    }
+
+    private function registerSemaphoreConfiguration(array $config, ContainerBuilder $container, PhpFileLoader $loader)
+    {
+        $loader->load('semaphore.php');
+
+        foreach ($config['resources'] as $resourceName => $resourceStore) {
+            $storeDsn = $container->resolveEnvPlaceholders($resourceStore, null, $usedEnvs);
+            $storeDefinition = new Definition(SemaphoreStoreInterface::class);
+            $storeDefinition->setFactory([SemaphoreStoreFactory::class, 'createStore']);
+            $storeDefinition->setArguments([$resourceStore]);
+
+            $container->setDefinition($storeDefinitionId = '.semaphore.'.$resourceName.'.store.'.$container->hash($storeDsn), $storeDefinition);
+
+            // Generate factories for each resource
+            $factoryDefinition = new ChildDefinition('semaphore.factory.abstract');
+            $factoryDefinition->replaceArgument(0, new Reference($storeDefinitionId));
+            $container->setDefinition('semaphore.'.$resourceName.'.factory', $factoryDefinition);
+
+            // Generate services for semaphore instances
+            $semaphoreDefinition = new Definition(Semaphore::class);
+            $semaphoreDefinition->setPublic(false);
+            $semaphoreDefinition->setFactory([new Reference('semaphore.'.$resourceName.'.factory'), 'createSemaphore']);
+            $semaphoreDefinition->setArguments([$resourceName]);
+
+            // provide alias for default resource
+            if ('default' === $resourceName) {
+                $container->setAlias('semaphore.factory', new Alias('semaphore.'.$resourceName.'.factory', false));
+                $container->setAlias(SemaphoreFactory::class, new Alias('semaphore.factory', false));
+            } else {
+                $container->registerAliasForArgument('semaphore.'.$resourceName.'.factory', SemaphoreFactory::class, $resourceName.'.semaphore.factory');
             }
         }
     }
@@ -2349,11 +2456,11 @@ class FrameworkExtension extends Extension
             MailgunTransportFactory::class => 'mailer.transport_factory.mailgun',
             MailjetTransportFactory::class => 'mailer.transport_factory.mailjet',
             MandrillTransportFactory::class => 'mailer.transport_factory.mailchimp',
+            OhMySmtpTransportFactory::class => 'mailer.transport_factory.ohmysmtp',
             PostmarkTransportFactory::class => 'mailer.transport_factory.postmark',
             SendgridTransportFactory::class => 'mailer.transport_factory.sendgrid',
             SendinblueTransportFactory::class => 'mailer.transport_factory.sendinblue',
             SesTransportFactory::class => 'mailer.transport_factory.amazon',
-            OhMySmtpTransportFactory::class => 'mailer.transport_factory.ohmysmtp',
         ];
 
         foreach ($classToServices as $class => $service) {
@@ -2397,11 +2504,13 @@ class FrameworkExtension extends Extension
             $container->getDefinition('chatter.transports')->setArgument(0, $config['chatter_transports']);
         } else {
             $container->removeDefinition('chatter');
+            $container->removeAlias(ChatterInterface::class);
         }
         if ($config['texter_transports']) {
             $container->getDefinition('texter.transports')->setArgument(0, $config['texter_transports']);
         } else {
             $container->removeDefinition('texter');
+            $container->removeAlias(TexterInterface::class);
         }
 
         if ($this->mailerConfigEnabled) {
@@ -2438,6 +2547,7 @@ class FrameworkExtension extends Extension
             AmazonSnsTransportFactory::class => 'notifier.transport_factory.amazon-sns',
             ClickatellTransportFactory::class => 'notifier.transport_factory.clickatell',
             DiscordTransportFactory::class => 'notifier.transport_factory.discord',
+            EngagespotTransportFactory::class => 'notifier.transport_factory.engagespot',
             EsendexTransportFactory::class => 'notifier.transport_factory.esendex',
             ExpoTransportFactory::class => 'notifier.transport_factory.expo',
             FakeChatTransportFactory::class => 'notifier.transport_factory.fake-chat',
@@ -2465,6 +2575,7 @@ class FrameworkExtension extends Extension
             OrangeSmsTransportFactory::class => 'notifier.transport_factory.orange-sms',
             OvhCloudTransportFactory::class => 'notifier.transport_factory.ovh-cloud',
             RocketChatTransportFactory::class => 'notifier.transport_factory.rocket-chat',
+            SendberryTransportFactory::class => 'notifier.transport_factory.sendberry',
             SendinblueNotifierTransportFactory::class => 'notifier.transport_factory.sendinblue',
             SinchTransportFactory::class => 'notifier.transport_factory.sinch',
             SlackTransportFactory::class => 'notifier.transport_factory.slack',
@@ -2492,7 +2603,7 @@ class FrameworkExtension extends Extension
             }
         }
 
-        if (ContainerBuilder::willBeAvailable('symfony/mercure-notifier', MercureTransportFactory::class, $parentPackages) && ContainerBuilder::willBeAvailable('symfony/mercure-bundle', MercureBundle::class, $parentPackages)) {
+        if (ContainerBuilder::willBeAvailable('symfony/mercure-notifier', MercureTransportFactory::class, $parentPackages) && ContainerBuilder::willBeAvailable('symfony/mercure-bundle', MercureBundle::class, $parentPackages) && \in_array(MercureBundle::class, $container->getParameter('kernel.bundles'), true)) {
             $container->getDefinition($classToServices[MercureTransportFactory::class])
                 ->replaceArgument('$registry', new Reference(HubRegistry::class));
         } elseif (ContainerBuilder::willBeAvailable('symfony/mercure-notifier', MercureTransportFactory::class, $parentPackages)) {
@@ -2583,6 +2694,90 @@ class FrameworkExtension extends Extension
 
         if (!class_exists(UidValueResolver::class)) {
             $container->removeDefinition('argument_resolver.uid');
+        }
+    }
+
+    private function registerHtmlSanitizerConfiguration(array $config, ContainerBuilder $container, PhpFileLoader $loader)
+    {
+        $loader->load('html_sanitizer.php');
+
+        foreach ($config['sanitizers'] as $sanitizerName => $sanitizerConfig) {
+            $configId = 'html_sanitizer.config.'.$sanitizerName;
+            $def = $container->register($configId, HtmlSanitizerConfig::class);
+
+            // Base
+            if ($sanitizerConfig['allow_safe_elements']) {
+                $def->addMethodCall('allowSafeElements', [], true);
+            }
+
+            if ($sanitizerConfig['allow_static_elements']) {
+                $def->addMethodCall('allowStaticElements', [], true);
+            }
+
+            // Configures elements
+            foreach ($sanitizerConfig['allow_elements'] as $element => $attributes) {
+                $def->addMethodCall('allowElement', [$element, $attributes], true);
+            }
+
+            foreach ($sanitizerConfig['block_elements'] as $element) {
+                $def->addMethodCall('blockElement', [$element], true);
+            }
+
+            foreach ($sanitizerConfig['drop_elements'] as $element) {
+                $def->addMethodCall('dropElement', [$element], true);
+            }
+
+            // Configures attributes
+            foreach ($sanitizerConfig['allow_attributes'] as $attribute => $elements) {
+                $def->addMethodCall('allowAttribute', [$attribute, $elements], true);
+            }
+
+            foreach ($sanitizerConfig['drop_attributes'] as $attribute => $elements) {
+                $def->addMethodCall('dropAttribute', [$attribute, $elements], true);
+            }
+
+            // Force attributes
+            foreach ($sanitizerConfig['force_attributes'] as $element => $attributes) {
+                foreach ($attributes as $attrName => $attrValue) {
+                    $def->addMethodCall('forceAttribute', [$element, $attrName, $attrValue], true);
+                }
+            }
+
+            // Settings
+            $def->addMethodCall('forceHttpsUrls', [$sanitizerConfig['force_https_urls']], true);
+            if ($sanitizerConfig['allowed_link_schemes']) {
+                $def->addMethodCall('allowLinkSchemes', [$sanitizerConfig['allowed_link_schemes']], true);
+            }
+            $def->addMethodCall('allowLinkHosts', [$sanitizerConfig['allowed_link_hosts']], true);
+            $def->addMethodCall('allowRelativeLinks', [$sanitizerConfig['allow_relative_links']], true);
+            if ($sanitizerConfig['allowed_media_schemes']) {
+                $def->addMethodCall('allowMediaSchemes', [$sanitizerConfig['allowed_media_schemes']], true);
+            }
+            $def->addMethodCall('allowMediaHosts', [$sanitizerConfig['allowed_media_hosts']], true);
+            $def->addMethodCall('allowRelativeMedias', [$sanitizerConfig['allow_relative_medias']], true);
+
+            // Custom attribute sanitizers
+            foreach ($sanitizerConfig['with_attribute_sanitizers'] as $serviceName) {
+                $def->addMethodCall('withAttributeSanitizer', [new Reference($serviceName)], true);
+            }
+
+            foreach ($sanitizerConfig['without_attribute_sanitizers'] as $serviceName) {
+                $def->addMethodCall('withoutAttributeSanitizer', [new Reference($serviceName)], true);
+            }
+
+            if ($sanitizerConfig['max_input_length']) {
+                $def->addMethodCall('withMaxInputLength', [$sanitizerConfig['max_input_length']], true);
+            }
+
+            // Create the sanitizer and link its config
+            $sanitizerId = 'html_sanitizer.sanitizer.'.$sanitizerName;
+            $container->register($sanitizerId, HtmlSanitizer::class)
+                ->addTag('html_sanitizer', ['sanitizer' => $sanitizerName])
+                ->addArgument(new Reference($configId));
+
+            if ('default' !== $sanitizerName) {
+                $container->registerAliasForArgument($sanitizerId, HtmlSanitizerInterface::class, $sanitizerName);
+            }
         }
     }
 

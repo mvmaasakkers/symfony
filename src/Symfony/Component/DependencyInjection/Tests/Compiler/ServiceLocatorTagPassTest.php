@@ -42,10 +42,8 @@ class ServiceLocatorTagPassTest extends TestCase
         (new ServiceLocatorTagPass())->process($container);
     }
 
-    public function testInvalidServices()
+    public function testScalarServices()
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid definition for service "foo": an array of references is expected as first argument when the "container.service_locator" tag is set, "string" found for key "0".');
         $container = new ContainerBuilder();
 
         $container->register('foo', ServiceLocator::class)
@@ -56,6 +54,8 @@ class ServiceLocatorTagPassTest extends TestCase
         ;
 
         (new ServiceLocatorTagPass())->process($container);
+
+        $this->assertSame('dummy', $container->get('foo')->get(0));
     }
 
     public function testProcessValue()
@@ -184,19 +184,19 @@ class ServiceLocatorTagPassTest extends TestCase
 
         $container->setDefinition(Service::class, $service);
 
-        $decorated = new Definition(Decorated::class);
+        $decorated = new Definition(DecoratedService::class);
         $decorated->setPublic(true);
         $decorated->setDecoratedService(Service::class);
 
-        $container->setDefinition(Decorated::class, $decorated);
+        $container->setDefinition(DecoratedService::class, $decorated);
 
         $container->compile();
 
         /** @var ServiceLocator $locator */
         $locator = $container->get(Locator::class)->locator;
         static::assertTrue($locator->has(Service::class));
-        static::assertFalse($locator->has(Decorated::class));
-        static::assertInstanceOf(Decorated::class, $locator->get(Service::class));
+        static::assertFalse($locator->has(DecoratedService::class));
+        static::assertInstanceOf(DecoratedService::class, $locator->get(Service::class));
     }
 
     public function testDefinitionOrderIsTheSame()
@@ -213,6 +213,18 @@ class ServiceLocatorTagPassTest extends TestCase
         $factories = $locator->getArguments()[0];
 
         static::assertSame(['service-2', 'service-1'], array_keys($factories));
+    }
+
+    public function testBindingsAreProcessed()
+    {
+        $container = new ContainerBuilder();
+
+        $definition = $container->register('foo')
+            ->setBindings(['foo' => new ServiceLocatorArgument()]);
+
+        (new ServiceLocatorTagPass())->process($container);
+
+        $this->assertInstanceOf(Reference::class, $definition->getBindings()['foo']->getValues()[0]);
     }
 }
 

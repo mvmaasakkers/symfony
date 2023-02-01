@@ -60,7 +60,7 @@ class Registry
     {
         $reflector = self::$reflectors[$class] ?? self::getClassReflector($class, true, false);
 
-        return self::$factories[$class] = $reflector->newInstanceWithoutConstructor(...);
+        return self::$factories[$class] = [$reflector, 'newInstanceWithoutConstructor'](...);
     }
 
     public static function getClassReflector($class, $instantiableWithoutConstructor = false, $cloneable = null)
@@ -85,7 +85,7 @@ class Registry
             try {
                 $proto = $reflector->newInstanceWithoutConstructor();
                 $instantiableWithoutConstructor = true;
-            } catch (\ReflectionException $e) {
+            } catch (\ReflectionException) {
                 $proto = $reflector->implementsInterface('Serializable') && !method_exists($class, '__unserialize') ? 'C:' : 'O:';
                 if ('C:' === $proto && !$reflector->getMethod('unserialize')->isInternal()) {
                     $proto = null;

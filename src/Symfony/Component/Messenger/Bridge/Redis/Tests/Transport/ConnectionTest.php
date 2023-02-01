@@ -31,10 +31,11 @@ class ConnectionTest extends TestCase
     public function testFromDsn()
     {
         $this->assertEquals(
-            new Connection(['stream' => 'queue'], [
+            new Connection([
+                'stream' => 'queue',
                 'host' => 'localhost',
                 'port' => 6379,
-            ], [], $this->createMock(\Redis::class)),
+            ], $this->createMock(\Redis::class)),
             Connection::fromDsn('redis://localhost/queue?', [], $this->createMock(\Redis::class))
         );
     }
@@ -42,10 +43,11 @@ class ConnectionTest extends TestCase
     public function testFromDsnOnUnixSocket()
     {
         $this->assertEquals(
-            new Connection(['stream' => 'queue'], [
+            new Connection([
+                'stream' => 'queue',
                 'host' => '/var/run/redis/redis.sock',
                 'port' => 0,
-            ], [], $redis = $this->createMock(\Redis::class)),
+            ], $redis = $this->createMock(\Redis::class)),
             Connection::fromDsn('redis:///var/run/redis/redis.sock', ['stream' => 'queue'], $redis)
         );
     }
@@ -80,10 +82,12 @@ class ConnectionTest extends TestCase
     public function testFromDsnWithQueryOptions()
     {
         $this->assertEquals(
-            new Connection(['stream' => 'queue', 'group' => 'group1', 'consumer' => 'consumer1'], [
+            new Connection([
+                'stream' => 'queue',
+                'group' => 'group1',
+                'consumer' => 'consumer1',
                 'host' => 'localhost',
                 'port' => 6379,
-            ], [
                 'serializer' => 2,
             ], $this->createMock(\Redis::class)),
             Connection::fromDsn('redis://localhost/queue/group1/consumer1?serializer=2', [], $this->createMock(\Redis::class))
@@ -106,7 +110,7 @@ class ConnectionTest extends TestCase
     public function testRedisClusterInstanceIsSupported()
     {
         $redis = $this->createMock(\RedisCluster::class);
-        $this->assertInstanceOf(Connection::class, new Connection([], [], [], $redis));
+        $this->assertInstanceOf(Connection::class, new Connection([], $redis));
     }
 
     public function testKeepGettingPendingMessages()
@@ -232,7 +236,7 @@ class ConnectionTest extends TestCase
         $redis->expects($this->exactly(3))->method('xreadgroup')
             ->withConsecutive(
                 ['symfony', 'consumer', ['queue' => '0'], 1, null], // first call for pending messages
-                ['symfony', 'consumer', ['queue' => '0'], 1, null], // sencond call because of claimed message (redisid-123)
+                ['symfony', 'consumer', ['queue' => '0'], 1, null], // second call because of claimed message (redisid-123)
                 ['symfony', 'consumer', ['queue' => '>'], 1, null] // third call because of no result (other consumer claimed message redisid-123)
             )
             ->willReturnOnConsecutiveCalls([], [], []);
@@ -258,11 +262,11 @@ class ConnectionTest extends TestCase
         $redis->expects($this->exactly(2))->method('xreadgroup')
             ->withConsecutive(
                 ['symfony', 'consumer', ['queue' => '0'], 1, null], // first call for pending messages
-                ['symfony', 'consumer', ['queue' => '0'], 1, null] // sencond call because of claimed message (redisid-123)
+                ['symfony', 'consumer', ['queue' => '0'], 1, null] // second call because of claimed message (redisid-123)
             )
             ->willReturnOnConsecutiveCalls(
                 [], // first call returns no result
-                ['queue' => [['message' => '{"body":"1","headers":[]}']]] // second call returns clamed message (redisid-123)
+                ['queue' => [['message' => '{"body":"1","headers":[]}']]] // second call returns claimed message (redisid-123)
             );
 
         $redis->expects($this->once())->method('xpending')->willReturn([[
@@ -358,5 +362,49 @@ class ConnectionTest extends TestCase
         }
 
         $this->assertSame('xack error', $e->getMessage());
+    }
+
+    /**
+     * @dataProvider provideIdPatterns
+     */
+    public function testAddReturnId(string $expected, \Redis $redis, int $delay = 0)
+    {
+        $id = Connection::fromDsn(dsn: 'redis://localhost/queue', redis: $redis)->add('body', [], $delay);
+
+        $this->assertMatchesRegularExpression($expected, $id);
+    }
+
+    public function provideIdPatterns(): \Generator
+    {
+        $redis = $this->createMock(\Redis::class);
+        $redis->expects($this->atLeastOnce())->method('xadd')->willReturn('THE_MESSAGE_ID');
+
+        yield 'No delay' => ['/^THE_MESSAGE_ID$/', $redis];
+
+        $redis = $this->createMock(\Redis::class);
+        $redis->expects($this->atLeastOnce())->method('rawCommand')->willReturn('1');
+        yield '100ms delay' => ['/^\w+\.\d+$/', $redis, 100];
+    }
+
+    public function testInvalidSentinelMasterName()
+    {
+        try {
+            Connection::fromDsn(getenv('MESSENGER_REDIS_DSN'), ['delete_after_ack' => true], null);
+        } catch (\Exception $e) {
+            self::markTestSkipped($e->getMessage());
+        }
+
+        if (!getenv('MESSENGER_REDIS_SENTINEL_MASTER')) {
+            self::markTestSkipped('Redis sentinel is not configured');
+        }
+
+        $master = getenv('MESSENGER_REDIS_DSN');
+        $uid = uniqid('sentinel_');
+
+        $exp = explode('://', $master, 2)[1];
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Failed to retrieve master information from master name "%s" and address "%s".', $uid, $exp));
+
+        Connection::fromDsn(sprintf('%s/messenger-clearlasterror', $master), ['delete_after_ack' => true, 'sentinel_master' => $uid], null);
     }
 }
